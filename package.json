@@ -1,0 +1,22 @@
+{
+  "name": "school-sync-suite",
+  "version": "1.0.0",
+  "description": "Multi-tenant school automation & sync suite",
+  "private": true,
+  "scripts": {
+    "dev:backend": "pnpm --filter backend dev",
+    "dev:frontend": "pnpm --filter frontend dev",
+    "dev": "pnpm --parallel dev",
+    "build:shared": "pnpm --filter shared build",
+    "build:backend": "pnpm --filter backend build",
+    "build:frontend": "pnpm --filter frontend build",
+    "build": "pnpm build:shared && pnpm build:backend && pnpm build:frontend",
+    "start:backend": "pnpm --filter backend start:prod",
+    "start:frontend": "pnpm --filter frontend start",
+    "install:all": "pnpm install"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "packageManager": "pnpm@10.29.3+sha512.498e1fb4cca5aa06c1dcf2611e6fafc50972ffe7189998c409e90de74566444298ffe43e6cd2acdc775ba1aa7cc5e092a8b7054c811ba8c5770f84693d33d2dc"
+}

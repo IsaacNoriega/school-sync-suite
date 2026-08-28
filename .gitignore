@@ -1,0 +1,138 @@
+# =============================================
+# DEPENDENCIAS
+# =============================================
+node_modules/
+jspm_packages/
+web_modules/
+.pnpm-store/
+
+# =============================================
+# BUILDS Y COMPILADOS
+# =============================================
+dist/
+build/
+out/
+.next/
+.docusaurus/
+.cache/
+*.tsbuildinfo
+
+# NestJS compilado
+apps/backend/dist/
+
+# Next.js build
+apps/frontend/.next/
+apps/frontend/out/
+
+# Shared package build
+packages/shared/dist/
+
+# =============================================
+# ARCHIVOS DE ENTORNO (CREDENCIALES - NO SUBIR)
+# =============================================
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+*.env
+# Sí subir los de ejemplo (sin datos reales)
+!*.env.example
+!*.env.template
+
+# =============================================
+# LOGS
+# =============================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# =============================================
+# RUNTIME / PIDS
+# =============================================
+*.pid
+*.seed
+*.pid.lock
+pids/
+
+# =============================================
+# COBERTURA DE PRUEBAS
+# =============================================
+coverage/
+*.lcov
+.nyc_output/
+lib-cov/
+
+# =============================================
+# HERRAMIENTAS DE DESARROLLO / IDEs
+# =============================================
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# =============================================
+# SISTEMA OPERATIVO
+# =============================================
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+*~
+
+# =============================================
+# CERTIFICADOS Y CLAVES (SEGURIDAD)
+# =============================================
+*.pem
+*.p12
+*.pfx
+*.key
+*.cert
+*.crt
+*.csr
+*.jks
+secrets/
+.secrets/
+
+# =============================================
+# ARCHIVOS TEMPORALES
+# =============================================
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+
+# =============================================
+# ARCHIVOS EXCEL / CSV GENERADOS
+# =============================================
+exports/
+*.xlsx
+*.xls
+*.csv
