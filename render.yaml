@@ -1,0 +1,28 @@
+﻿services:
+  # Backend (NestJS)
+  - type: web
+    name: school-sync-backend
+    env: node
+    plan: free
+    buildCommand: pnpm build:shared && pnpm --filter backend build
+    startCommand: pnpm --filter backend start:prod
+    envVars:
+      - key: MONGO_URI
+        sync: false  # Configurar manualmente en el dashboard de Render
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRATION
+        value: 24h
+      - key: PORT
+        value: 3001
+
+  # Frontend (Next.js)
+  - type: web
+    name: school-sync-frontend
+    env: node
+    plan: free
+    buildCommand: pnpm build:shared && pnpm --filter frontend build
+    startCommand: pnpm --filter frontend start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://school-sync-backend.onrender.com
