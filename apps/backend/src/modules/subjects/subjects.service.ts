@@ -9,7 +9,21 @@ export class SubjectsService {
     @InjectModel(Subject.name) private subjectModel: Model<Subject>,
   ) {}
 
-  async create(teacherId: string, name: string, code: string, description?: string) {
+  async create(teacherId: string, name: string, description?: string) {
+    const prefix = name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9 ]/g, '')
+      .trim()
+      .toUpperCase()
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 3)
+      .map(w => w.slice(0, 3))
+      .join('')
+      .slice(0, 3);
+    const suffix = Math.floor(100 + Math.random() * 900);
+    const code = `${prefix}-${suffix}`;
     return this.subjectModel.create({
       teacher: teacherId,
       name,

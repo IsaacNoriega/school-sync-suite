@@ -653,7 +653,7 @@ body {
   background: white;
   border: 1px solid var(--border-color);
   border-radius: 16px;
-  padding: 24px;
+  padding: 0;
   cursor: pointer;
   transition: var(--transition-smooth);
   display: flex;
@@ -662,23 +662,50 @@ body {
   position: relative;
   box-shadow: var(--shadow-sm);
   height: 160px;
+  overflow: hidden;
+}
+
+/* Colored top tab */
+.subject-card::before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 6px;
+  background: var(--card-color, #0284c7);
+  flex-shrink: 0;
+}
+
+/* Inner content wrapper */
+.subject-card-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   justify-content: space-between;
+  flex: 1;
+  padding: 16px 20px 20px 20px;
+  width: 100%;
 }
 
 .subject-card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 8px 24px -4px color-mix(in srgb, var(--card-color, #0284c7) 25%, transparent);
+  border-color: color-mix(in srgb, var(--card-color, #0284c7) 40%, transparent);
 }
 
 .subject-card.active {
-  border: 2px solid var(--primary);
-  box-shadow: 0 0 0 4px rgba(2, 132, 199, 0.15);
+  border: 2px solid var(--card-color, var(--primary));
+  border-top: 2px solid var(--card-color, var(--primary));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--card-color, #0284c7) 15%, transparent);
+}
+
+.subject-card.active::before {
+  height: 5px; /* compensate for thicker border */
 }
 
 .subject-card-icon-box {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -686,9 +713,9 @@ body {
 }
 
 .subject-card-name {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 800;
-  color: #1e293b;
+  color: var(--card-color, #1e293b);
   line-height: 1.2;
-  margin-top: 16px;
+  margin-top: 10px;
 }
