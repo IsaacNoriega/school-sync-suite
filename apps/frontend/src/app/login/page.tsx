@@ -63,14 +63,27 @@ export default function LoginPage() {
         textAlign: 'center'
       }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
-          <Image
-            src="/logo.jpg"
-            alt="EducaQR Logo"
-            width={280}
-            height={158}
-            style={{ objectFit: 'contain' }}
-            priority
-          />
+          <div style={{
+            width: '120px',
+            height: '120px',
+            borderRadius: '50%',
+            overflow: 'hidden',
+            border: '2px solid #e2e8f0',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#f8fafc'
+          }}>
+            <Image
+              src="/logo-circle.png"
+              alt="EducaQR Logo"
+              width={120}
+              height={120}
+              style={{ objectFit: 'cover' }}
+              priority
+            />
+          </div>
         </div>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginBottom: '30px' }}>
           Acceso al Panel de Control Académico
