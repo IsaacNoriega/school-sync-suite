@@ -781,7 +781,7 @@ export default function DashboardPage() {
         </nav>
 
         {/* Sidebar footer: teacher profile dropdown + logout */}
-        <div style={{ marginTop: 'auto', padding: '12px 16px 16px 16px', borderTop: '1px solid var(--border-color)' }}>
+        <div className="sidebar-footer">
 
           {/* User card — click toggles dropdown */}
           <div style={{ position: 'relative' }}>
@@ -1144,7 +1144,7 @@ export default function DashboardPage() {
                   </div>
 
                   {/* Metric Summary Cards */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '10px' }}>
+                  <div className="responsive-3col-grid" style={{ marginBottom: '10px' }}>
 
                     <div className="mini-stat-card" style={{ padding: '20px 24px', alignItems: 'flex-start', textAlign: 'left' }}>
                       <div className="mini-stat-icon-wrapper" style={{ background: '#d1fae5', color: '#10b981', alignSelf: 'flex-start' }}>
@@ -1725,7 +1725,7 @@ export default function DashboardPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                       
                       {/* Metric Summary Cards */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+                      <div className="responsive-3col-grid">
                         
                         <div className="mini-stat-card" style={{ padding: '20px 24px', alignItems: 'flex-start', textAlign: 'left' }}>
                           <div className="mini-stat-icon-wrapper" style={{ background: '#e0f2fe', color: '#0284c7', alignSelf: 'flex-start' }}>
@@ -1766,7 +1766,7 @@ export default function DashboardPage() {
                       </div>
 
                       {/* Split Columns: Attendance and Grades */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'start' }}>
+                      <div className="responsive-2col-grid" style={{ alignItems: 'start' }}>
                         
                         {/* Attendance History Card */}
                         <div className="glass-panel" style={{ padding: '24px' }}>
@@ -1882,7 +1882,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
+                  <div className="responsive-split-1-2">
                     
                     {/* Form */}
                     <div className="glass-panel">
@@ -1977,7 +1977,7 @@ export default function DashboardPage() {
           )}
                     {/* TAB: Reports (Calificaciones) */}
           {activeTab === 'reports' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 3fr', gap: '20px' }}>
+            <div className="responsive-split-1-3">
               
               {/* Form & Selection */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -2121,7 +2121,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'start' }}>
+              <div className="responsive-2col-grid" style={{ alignItems: 'start' }}>
                 {/* Account Details */}
                 <div className="glass-panel" style={{ padding: '28px' }}>
                   <h3 style={{ fontSize: '1.25rem', color: '#0369a1', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
