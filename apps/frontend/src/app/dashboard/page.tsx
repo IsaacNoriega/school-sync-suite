@@ -8,7 +8,7 @@ import {
   BookOpen, Users, FileText, CheckSquare, LogOut, 
   Plus, Calendar, RefreshCw, Award, Radio, QrCode, 
   Smartphone, Bell, HelpCircle, ShieldAlert,
-  Search, User, Trash2, Check, X, Download, TrendingUp, UserCheck, UserX, Clock, Globe, FlaskConical, Calculator, ArrowLeft, Eye, ChevronLeft, ChevronRight, School
+  Search, User, Trash2, Check, X, Download, TrendingUp, UserCheck, UserX, Clock, Globe, FlaskConical, Calculator, ArrowLeft, Eye, ChevronLeft, ChevronRight, School, Menu
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -64,6 +64,7 @@ export default function DashboardPage() {
   const [showCreateSubjectModal, setShowCreateSubjectModal] = useState(false);
   const [showCreateAssignmentModal, setShowCreateAssignmentModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Change password form state
   const [oldPassword, setOldPassword] = useState('');
@@ -721,9 +722,26 @@ export default function DashboardPage() {
   return (
     <div className="app-layout">
       
+      {/* Backdrop overlay for mobile sidebar */}
+      {isMobileSidebarOpen && (
+        <div 
+          className="sidebar-backdrop" 
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
+
       {/* 1. SIDEBAR (Image 2) */}
-      <aside className="sidebar">
-        <div className="sidebar-brand" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <aside className={`sidebar ${isMobileSidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-brand" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
+          {/* Mobile close button inside sidebar brand */}
+          <button 
+            className="mobile-close-btn"
+            onClick={() => setIsMobileSidebarOpen(false)}
+            style={{ display: 'none' }}
+            title="Cerrar menú"
+          >
+            <X size={20} />
+          </button>
           {/* Circular icon */}
           <div style={{
             width: '42px', height: '42px', borderRadius: '50%',
@@ -748,7 +766,7 @@ export default function DashboardPage() {
           {teacher?.role === 'SUPER_ADMIN' && (
             <div 
               className={`nav-item ${activeTab === 'teachers' ? 'active' : ''}`}
-              onClick={() => setActiveTab('teachers')}
+              onClick={() => { setActiveTab('teachers'); setIsMobileSidebarOpen(false); }}
             >
               <User size={20} />
               <span>Teachers</span>
@@ -757,7 +775,7 @@ export default function DashboardPage() {
 
           <div 
             className={`nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
-            onClick={() => setActiveTab('attendance')}
+            onClick={() => { setActiveTab('attendance'); setIsMobileSidebarOpen(false); }}
           >
             <Calendar size={20} />
             <span>Attendance</span>
@@ -765,7 +783,7 @@ export default function DashboardPage() {
 
           <div 
             className={`nav-item ${activeTab === 'subjects' ? 'active' : ''}`}
-            onClick={() => setActiveTab('subjects')}
+            onClick={() => { setActiveTab('subjects'); setIsMobileSidebarOpen(false); }}
           >
             <BookOpen size={20} />
             <span>Subjects</span>
@@ -773,7 +791,7 @@ export default function DashboardPage() {
 
           <div 
             className={`nav-item ${activeTab === 'students' ? 'active' : ''}`}
-            onClick={() => setActiveTab('students')}
+            onClick={() => { setActiveTab('students'); setIsMobileSidebarOpen(false); }}
           >
             <Users size={20} />
             <span>Students</span>
@@ -818,7 +836,7 @@ export default function DashboardPage() {
                 boxShadow: '0 4px 16px rgba(0,0,0,0.10)', zIndex: 50, overflow: 'hidden'
               }}>
                 <button
-                  onClick={() => { setShowUserMenu(false); setActiveTab('settings'); }}
+                  onClick={() => { setShowUserMenu(false); setActiveTab('settings'); setIsMobileSidebarOpen(false); }}
                   style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', transition: 'background 0.15s' }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
@@ -848,6 +866,28 @@ export default function DashboardPage() {
       {/* RIGHT SIDE WRAPPER */}
       <div className="main-wrapper">
         
+        {/* Mobile Header Bar */}
+        <header className="mobile-topbar" style={{ display: 'none' }}>
+          <button 
+            onClick={() => setIsMobileSidebarOpen(true)} 
+            className="mobile-hamburger-btn"
+            title="Abrir menú"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1e293b', padding: '4px', display: 'flex', alignItems: 'center' }}
+          >
+            <Menu size={22} />
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Image src="/logo-circle.png" alt="EducaQR" width={32} height={32} style={{ objectFit: 'contain' }} />
+            <span style={{ fontWeight: 800, fontSize: '1rem', color: '#1e3a5f' }}>Educa<span style={{ color: '#0ea5e9' }}>QR</span></span>
+          </div>
+          <div 
+            onClick={() => { setActiveTab('settings'); setIsMobileSidebarOpen(false); }}
+            style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #0284c7, #0ea5e9)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
+          >
+            {teacher ? getInitials(teacher.name) : 'MA'}
+          </div>
+        </header>
+
         {/* 3. CONTENT BODY (topbar removed) */}
         <div className="content-body">
           
@@ -893,9 +933,9 @@ export default function DashboardPage() {
                     <ChevronLeft size={20} />
                   </button>
                   
-                  <h2 className="attendance-title" style={{ margin: 0, minWidth: '320px' }}>
-                    Pase de Lista - {selectedDate ? formatSpanishDate(selectedDate) : 'Hoy'}
-                  </h2>
+                   <h2 className="attendance-title" style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, textAlign: 'center', flex: 1, color: '#0f172a' }}>
+                     Pase de Lista - {selectedDate ? formatSpanishDate(selectedDate) : 'Hoy'}
+                   </h2>
                   
                   <button 
                     onClick={() => handleAdjustDate(1)} 
@@ -918,7 +958,7 @@ export default function DashboardPage() {
                     <ChevronRight size={20} />
                   </button>
                 </div>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <div className="attendance-actions-wrapper">
                   <div style={{ position: 'relative', width: '40px', height: '40px' }}>
                     <button 
                       type="button"
@@ -1353,8 +1393,8 @@ export default function DashboardPage() {
                   {/* Assignments Section below Subjects cards */}
                   {selectedSubject && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '10px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f1f5f9', paddingBottom: '12px' }}>
-                        <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>
+                      <div className="responsive-section-header">
+                        <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                           Tareas de {selectedSubject.name}
                         </h3>
                         <button 
