@@ -5,7 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../../database/schemas/user.schema';
 import { Teacher } from '../../database/schemas/teacher.schema';
-import { LoginDto, RegisterTeacherDto } from './dto/auth.dto';
+import { LoginDto, RegisterTeacherDto, ChangePasswordDto } from './dto/auth.dto';
 
 @Injectable()
 export class AuthService {
@@ -108,6 +108,23 @@ export class AuthService {
     user.isActive = isActive;
     await user.save();
     return { userId: user._id, email: user.email, isActive: user.isActive };
+  }
+
+  async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const isMatch = await bcrypt.compare(changePasswordDto.oldPassword, user.passwordHash);
+    if (!isMatch) {
+      throw new UnauthorizedException('Contraseña actual incorrecta');
+    }
+
+    user.passwordHash = await bcrypt.hash(changePasswordDto.newPassword, 10);
+    await user.save();
+
+    return { message: 'Contraseña actualizada correctamente' };
   }
 
   async listTeachers() {

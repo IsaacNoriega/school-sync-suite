@@ -1,9 +1,10 @@
 import { Controller, Post, Body, UseGuards, Get, Patch, Param, ParseBoolPipe } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterTeacherDto } from './dto/auth.dto';
+import { LoginDto, RegisterTeacherDto, ChangePasswordDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
+import { CurrentUser } from './decorators/current-user.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -36,5 +37,14 @@ export class AuthController {
     @Body('isActive') isActive: boolean,
   ) {
     return this.authService.toggleTeacherStatus(userId, isActive);
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  async changePassword(
+    @CurrentUser() user: any,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(user.sub, changePasswordDto);
   }
 }
