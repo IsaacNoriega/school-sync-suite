@@ -1011,3 +1011,19 @@ body {
   border-bottom: 2px solid #f1f5f9;
   padding-bottom: 12px;
 }
+
+/* Base styles for sidebar-footer on PC */
+.sidebar-footer {
+  margin-top: auto;
+  padding: 12px 16px 16px 16px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Base styles for attendance action buttons row on PC */
+.attendance-actions-wrapper {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
