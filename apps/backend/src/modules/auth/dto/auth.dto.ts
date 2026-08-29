@@ -29,3 +29,14 @@ export class RegisterTeacherDto {
   @IsNotEmpty()
   schoolName: string;
 }
+
+export class ChangePasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  oldPassword: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(6)
+  newPassword: string;
+}

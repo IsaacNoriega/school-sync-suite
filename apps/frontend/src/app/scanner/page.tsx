@@ -51,6 +51,8 @@ export default function ScannerPage() {
   } | null>(null);
 
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // Parse query string client-side safely
   useEffect(() => {
@@ -147,6 +149,35 @@ export default function ScannerPage() {
       }
     };
   }, [scanMode, selectedSubjectId, selectedAssignmentId]);
+
+  // Start rear camera feed for fullscreen background
+  useEffect(() => {
+    let active = true;
+    const startCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false
+        });
+        if (!active) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(() => {});
+        }
+      } catch (err) {
+        console.warn('No se pudo acceder a la cámara trasera:', err);
+      }
+    };
+    startCamera();
+    return () => {
+      active = false;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+    };
+  }, []);
 
   const fetchSubjects = async (authToken: string, initialSubjectId?: string) => {
     try {
@@ -306,17 +337,47 @@ export default function ScannerPage() {
 
   return (
     <div style={{ 
-      minHeight: '100vh', 
-      background: '#0f172a', 
+      position: 'fixed',
+      inset: 0,
       color: 'white',
-      display: 'flex', 
-      flexDirection: 'column', 
-      justifyContent: 'space-between',
-      position: 'relative',
-      overflow: 'hidden',
       fontFamily: 'var(--font-outfit)'
     }}>
-      
+
+      {/* ===== FULLSCREEN CAMERA BACKGROUND ===== */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        style={{
+          position: 'fixed',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          zIndex: 0
+        }}
+      />
+
+      {/* Dark vignette overlay so UI stays readable */}
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.10) 40%, rgba(0,0,0,0.10) 60%, rgba(0,0,0,0.65) 100%)',
+        zIndex: 1,
+        pointerEvents: 'none'
+      }} />
+
+      {/* ===== ALL UI IS OVERLAID ABOVE THE CAMERA ===== */}
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        zIndex: 2
+      }}>
+
       {/* Top Header */}
       <header style={{ 
         display: 'flex', 
@@ -1049,13 +1110,15 @@ export default function ScannerPage() {
         </div>
       )}
 
+      </div>{/* end UI overlay */}
+
       {/* Embedding Custom CSS Styles */}
       <style jsx>{`
         .qr-corner {
           position: absolute;
           width: 24px;
           height: 24px;
-          border: 4px solid #3b82f6; /* Blue matching screenshot */
+          border: 4px solid #3b82f6;
         }
         .corner-tl { top: 0; left: 0; border-right: none; border-bottom: none; border-top-left-radius: 12px; }
         .corner-tr { top: 0; right: 0; border-left: none; border-bottom: none; border-top-right-radius: 12px; }
@@ -1087,7 +1150,17 @@ export default function ScannerPage() {
       `}</style>
       
       <style jsx global>{`
-        /* Style overrides for html5-qrcode standard widgets */
+        /* Hide the internal video/viewfinder of html5-qrcode — we show our own */
+        #reader video,
+        #reader__scan_region video {
+          display: none !important;
+        }
+        #reader,
+        #reader__scan_region,
+        #reader__dashboard {
+          background: transparent !important;
+          border: none !important;
+        }
         #html5-qrcode-button-camera-start,
         #html5-qrcode-button-camera-stop,
         #html5-qrcode-button-camera-permission {

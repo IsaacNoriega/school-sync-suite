@@ -15,10 +15,9 @@ export class SubjectsController {
   create(
     @CurrentUser() user: any,
     @Body('name') name: string,
-    @Body('code') code: string,
     @Body('description') description?: string,
   ) {
-    return this.subjectsService.create(user.teacherId, name, code, description);
+    return this.subjectsService.create(user.teacherId, name, description);
   }
 
   @Get()

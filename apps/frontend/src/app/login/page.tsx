@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { LogIn, Key, Mail, ShieldAlert } from 'lucide-react';
+import { Key, Mail, ShieldAlert } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -61,22 +62,29 @@ export default function LoginPage() {
         padding: '40px 30px',
         textAlign: 'center'
       }}>
-        <div style={{
-          background: 'rgba(59, 130, 246, 0.1)',
-          width: '64px',
-          height: '64px',
-          borderRadius: '50%',
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: '20px',
-          border: '1px solid rgba(59, 130, 246, 0.2)'
-        }}>
-          <LogIn size={32} color="#3b82f6" />
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+          <div style={{
+            width: '120px',
+            height: '120px',
+            borderRadius: '50%',
+            overflow: 'hidden',
+            border: '2px solid #e2e8f0',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#f8fafc'
+          }}>
+            <Image
+              src="/logo-circle.png"
+              alt="EducaQR Logo"
+              width={120}
+              height={120}
+              style={{ objectFit: 'cover' }}
+              priority
+            />
+          </div>
         </div>
-        <h2 style={{ fontSize: '2rem', marginBottom: '8px' }}>
-          <span className="gradient-text">School Sync</span> Suite
-        </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginBottom: '30px' }}>
           Acceso al Panel de Control Académico
         </p>

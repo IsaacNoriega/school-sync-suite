@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
 import { 
   BookOpen, Users, FileText, CheckSquare, LogOut, 
   Plus, Calendar, RefreshCw, Award, Radio, QrCode, 
-  Smartphone, Bell, HelpCircle, GraduationCap, Settings, ShieldAlert,
-  Search, User, Trash2, Check, X, Download, TrendingUp, UserCheck, UserX, AlertTriangle, Clock, Globe, FlaskConical, Calculator, ArrowLeft, Eye, ChevronLeft, ChevronRight, School
+  Smartphone, Bell, HelpCircle, ShieldAlert,
+  Search, User, Trash2, Check, X, Download, TrendingUp, UserCheck, UserX, Clock, Globe, FlaskConical, Calculator, ArrowLeft, Eye, ChevronLeft, ChevronRight, School
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -42,8 +43,9 @@ export default function DashboardPage() {
 
   // Forms state
   const [newSubjectName, setNewSubjectName] = useState('');
-  const [newSubjectCode, setNewSubjectCode] = useState('');
   const [newSubjectDesc, setNewSubjectDesc] = useState('');
+  const [newSubjectIcon, setNewSubjectIcon] = useState('BookOpen');
+  const [newSubjectColor, setNewSubjectColor] = useState('#0284c7');
 
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentEnrollment, setNewStudentEnrollment] = useState('');
@@ -61,6 +63,15 @@ export default function DashboardPage() {
   const [studentSummaryLoading, setStudentSummaryLoading] = useState(false);
   const [showCreateSubjectModal, setShowCreateSubjectModal] = useState(false);
   const [showCreateAssignmentModal, setShowCreateAssignmentModal] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
+  // Change password form state
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
+  const [changePasswordError, setChangePasswordError] = useState('');
+  const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
 
   // Initials generator for topbar avatar (e.g., Ana Pérez -> AP)
   const getInitials = (name: string) => {
@@ -72,29 +83,49 @@ export default function DashboardPage() {
     return parts[0].substring(0, 2).toUpperCase();
   };
 
-  const getSubjectVisuals = (name: string, index: number) => {
-    const lowercase = name.toLowerCase();
-    const colors = [
-      { bg: '#e0f2fe', color: '#0284c7' },
-      { bg: '#f3e8ff', color: '#a855f7' },
-      { bg: '#ffedd5', color: '#f97316' },
-      { bg: '#fee2e2', color: '#ef4444' }
-    ];
-    const color = colors[index % colors.length];
+  const SUBJECT_ICON_OPTIONS: { key: string; label: string; node: React.ReactNode }[] = [
+    { key: 'BookOpen',     label: 'General',      node: <BookOpen size={20} /> },
+    { key: 'Calculator',  label: 'Matemáticas', node: <Calculator size={20} /> },
+    { key: 'FileText',    label: 'Lengua',       node: <FileText size={20} /> },
+    { key: 'FlaskConical',label: 'Ciencias',     node: <FlaskConical size={20} /> },
+    { key: 'Globe',       label: 'Historia',     node: <Globe size={20} /> },
+    { key: 'Users',       label: 'Grupo',        node: <Users size={20} /> },
+    { key: 'Award',       label: 'Premio',       node: <Award size={20} /> },
+    { key: 'CheckSquare', label: 'Evaluación', node: <CheckSquare size={20} /> },
+  ];
 
-    if (lowercase.includes('mat') || lowercase.includes('cálculo') || lowercase.includes('algebra') || lowercase.includes('arith')) {
-      return { icon: <Calculator size={24} />, bg: '#e0f2fe', color: '#0284c7' };
-    }
-    if (lowercase.includes('esp') || lowercase.includes('lengua') || lowercase.includes('lectura') || lowercase.includes('liter')) {
-      return { icon: <FileText size={24} />, bg: '#f3e8ff', color: '#a855f7' };
-    }
-    if (lowercase.includes('cien') || lowercase.includes('biol') || lowercase.includes('quim') || lowercase.includes('fisic') || lowercase.includes('lab')) {
-      return { icon: <FlaskConical size={24} />, bg: '#ffedd5', color: '#f97316' };
-    }
-    if (lowercase.includes('hist') || lowercase.includes('geog') || lowercase.includes('social') || lowercase.includes('civic') || lowercase.includes('mund')) {
-      return { icon: <Globe size={24} />, bg: '#fee2e2', color: '#ef4444' };
-    }
-    return { icon: <BookOpen size={24} />, ...color };
+  const SUBJECT_COLOR_OPTIONS = [
+    { bg: '#e0f2fe', color: '#0284c7', label: 'Azul' },
+    { bg: '#f3e8ff', color: '#a855f7', label: 'Morado' },
+    { bg: '#ffedd5', color: '#f97316', label: 'Naranja' },
+    { bg: '#fee2e2', color: '#ef4444', label: 'Rojo' },
+    { bg: '#dcfce7', color: '#16a34a', label: 'Verde' },
+    { bg: '#fef9c3', color: '#ca8a04', label: 'Amarillo' },
+    { bg: '#fce7f3', color: '#db2777', label: 'Rosa' },
+    { bg: '#e0e7ff', color: '#4f46e5', label: 'Índigo' },
+  ];
+
+  const getSubjectVisuals = (s: any, index: number) => {
+    // If subject has stored icon/color choices, use them
+    const colorEntry = SUBJECT_COLOR_OPTIONS.find(c => c.color === (s.color || '')) ||
+      [
+        { bg: '#e0f2fe', color: '#0284c7' },
+        { bg: '#f3e8ff', color: '#a855f7' },
+        { bg: '#ffedd5', color: '#f97316' },
+        { bg: '#fee2e2', color: '#ef4444' },
+      ][index % 4];
+
+    const iconKey = s.iconKey || (() => {
+      const lc = (s.name || '').toLowerCase();
+      if (lc.includes('mat') || lc.includes('cálculo') || lc.includes('algebra')) return 'Calculator';
+      if (lc.includes('esp') || lc.includes('lengua') || lc.includes('lectura')) return 'FileText';
+      if (lc.includes('cien') || lc.includes('biol') || lc.includes('quim') || lc.includes('físic') || lc.includes('lab')) return 'FlaskConical';
+      if (lc.includes('hist') || lc.includes('geog') || lc.includes('social')) return 'Globe';
+      return 'BookOpen';
+    })();
+
+    const iconNode = SUBJECT_ICON_OPTIONS.find(i => i.key === iconKey)?.node || <BookOpen size={24} />;
+    return { icon: iconNode, bg: colorEntry.bg, color: colorEntry.color };
   };
 
   useEffect(() => {
@@ -413,15 +444,21 @@ export default function DashboardPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ name: newSubjectName, code: newSubjectCode, description: newSubjectDesc })
+        body: JSON.stringify({ 
+          name: newSubjectName, 
+          description: newSubjectDesc,
+          iconKey: newSubjectIcon,
+          color: newSubjectColor
+        })
       });
       const data = await response.json();
       if (response.ok) {
         setSubjects(prev => [...prev, data]);
         if (!selectedSubject) setSelectedSubject(data);
         setNewSubjectName('');
-        setNewSubjectCode('');
         setNewSubjectDesc('');
+        setNewSubjectIcon('BookOpen');
+        setNewSubjectColor('#0284c7');
         addLog(`Materia creada: ${data.name}`);
       }
     } catch (err) {
@@ -449,6 +486,48 @@ export default function DashboardPage() {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setChangePasswordError('');
+    setChangePasswordSuccess('');
+
+    if (newPassword !== confirmPassword) {
+      setChangePasswordError('Las contraseñas nuevas no coinciden');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setChangePasswordError('La nueva contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+
+    setChangePasswordLoading(true);
+    try {
+      const response = await fetch('http://localhost:3001/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ oldPassword, newPassword })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setChangePasswordSuccess('Contraseña cambiada con éxito');
+        setOldPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        setChangePasswordError(data.message || 'Error al cambiar la contraseña');
+      }
+    } catch (err) {
+      setChangePasswordError('Error de red al intentar cambiar la contraseña');
+      console.error(err);
+    } finally {
+      setChangePasswordLoading(false);
     }
   };
 
@@ -644,24 +723,37 @@ export default function DashboardPage() {
       
       {/* 1. SIDEBAR (Image 2) */}
       <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="brand-icon-container">
-            <GraduationCap size={24} />
+        <div className="sidebar-brand" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Circular icon */}
+          <div style={{
+            width: '42px', height: '42px', borderRadius: '50%',
+            background: '#e8edf2', border: '1.5px solid #cbd5e1',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0, overflow: 'hidden'
+          }}>
+            <Image src="/logo-circle.png" alt="EducaQR icon" width={42} height={42}
+              style={{ objectFit: 'cover', width: '100%', height: '100%' }} priority
+            />
           </div>
-          <div className="brand-text">
-            <span className="brand-title">EduControl Pro</span>
-            <span className="brand-subtitle">Academic Management</span>
+          {/* Brand text */}
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '1.1rem', lineHeight: 1.1 }}>
+              <span style={{ color: '#1e3a5f' }}>Educa</span><span style={{ color: '#0ea5e9' }}>QR</span>
+            </div>
+            <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 500, marginTop: '1px' }}>Academic Management</div>
           </div>
         </div>
 
         <nav className="sidebar-nav">
-          <div 
-            className={`nav-item ${activeTab === 'teachers' ? 'active' : ''}`}
-            onClick={() => setActiveTab('teachers')}
-          >
-            <User size={20} />
-            <span>Teachers</span>
-          </div>
+          {teacher?.role === 'SUPER_ADMIN' && (
+            <div 
+              className={`nav-item ${activeTab === 'teachers' ? 'active' : ''}`}
+              onClick={() => setActiveTab('teachers')}
+            >
+              <User size={20} />
+              <span>Teachers</span>
+            </div>
+          )}
 
           <div 
             className={`nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
@@ -688,49 +780,68 @@ export default function DashboardPage() {
           </div>
         </nav>
 
-        {/* Sidebar footer: teacher profile + settings + logout */}
-        <div style={{ marginTop: 'auto', padding: '16px 16px 20px 16px', borderTop: '1px solid var(--border-color)' }}>
-          {/* Teacher / School info */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', padding: '10px', background: 'rgba(2, 132, 199, 0.06)', borderRadius: '12px' }}>
-            <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'linear-gradient(135deg, #0284c7, #0ea5e9)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white', fontWeight: 700, fontSize: '0.85rem' }}>
-              {teacher ? getInitials(teacher.name) : 'MA'}
-            </div>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {teacher?.name || 'Maestra'}
+        {/* Sidebar footer: teacher profile dropdown + logout */}
+        <div style={{ marginTop: 'auto', padding: '12px 16px 16px 16px', borderTop: '1px solid var(--border-color)' }}>
+
+          {/* User card — click toggles dropdown */}
+          <div style={{ position: 'relative' }}>
+            <div
+              onClick={() => setShowUserMenu(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'rgba(2, 132, 199, 0.06)', borderRadius: '12px', cursor: 'pointer', transition: 'background 0.2s', userSelect: 'none' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(2, 132, 199, 0.11)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(2, 132, 199, 0.06)'; }}
+            >
+              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #0284c7, #0ea5e9)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white', fontWeight: 700, fontSize: '0.82rem' }}>
+                {teacher ? getInitials(teacher.name) : 'MA'}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                <School size={11} color="var(--text-muted)" />
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {teacher?.school || 'Mi Escuela'}
-                </span>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {teacher?.name || 'Maestra'}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                  <School size={10} color="var(--text-muted)" />
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {teacher?.schoolName || 'Mi Escuela'}
+                  </span>
+                </div>
               </div>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', color: '#64748b' }}>
+                <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </div>
+
+            {/* Dropdown menu */}
+            {showUserMenu && (
+              <div style={{
+                position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, right: 0,
+                background: 'white', borderRadius: '10px', border: '1px solid var(--border-color)',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.10)', zIndex: 50, overflow: 'hidden'
+              }}>
+                <button
+                  onClick={() => { setShowUserMenu(false); setActiveTab('settings'); }}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', transition: 'background 0.15s' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  </svg>
+                  Configuración
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Action buttons row */}
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              title="Configuración"
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px', border: '1px solid var(--border-color)', borderRadius: '10px', background: 'white', color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#94a3b8'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
-              onClick={() => alert('Configuración próximamente')}
-            >
-              <Settings size={15} />
-              <span>Config</span>
-            </button>
-            <button
-              title="Cerrar sesión"
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px', border: '1px solid #fecaca', borderRadius: '10px', background: '#fff5f5', color: '#ef4444', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#fee2e2'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#fff5f5'; }}
-              onClick={handleLogout}
-            >
-              <LogOut size={15} />
-              <span>Salir</span>
-            </button>
-          </div>
+          {/* Logout button below */}
+          <button
+            onClick={handleLogout}
+            style={{ marginTop: '8px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '9px', border: '1px solid #fecaca', borderRadius: '10px', background: '#fff5f5', color: '#ef4444', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#fee2e2'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#fff5f5'; }}
+          >
+            <LogOut size={14} />
+            Cerrar Sesión
+          </button>
         </div>
       </aside>
 
@@ -977,60 +1088,8 @@ export default function DashboardPage() {
                     </button>
                   </div>
 
-                  {/* Row 3: Alerts warning container */}
-                  <div className="attendance-alerts-card">
-                    <div className="alert-warning-title">
-                      <AlertTriangle size={18} color="#f59e0b" />
-                      Alertas de Asistencia
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {filteredAttendance.filter(r => r.status === 'ABSENT').length === 0 ? (
-                        <div style={{ fontStyle: 'italic', fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', padding: '10px 0' }}>
-                          Sin faltas registradas el día de hoy.
-                        </div>
-                      ) : (
-                        filteredAttendance.filter(r => r.status === 'ABSENT').map(student => (
-                          <div key={student.studentId} className="alert-warning-item">
-                            <div className="alert-item-icon">
-                              <span style={{ fontWeight: 800, fontSize: '1rem' }}>!</span>
-                            </div>
-                            <div className="alert-item-text">
-                              <span className="alert-item-name">{student.name}</span>
-                              3 faltas consecutivas. Se requiere notificar a tutor.
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
 
-                  {/* WebSockets Realtime live feed logs inside stats panel (collapsible or neat log) */}
-                  <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Terminal de Eventos</span>
-                      <button onClick={() => setSyncLogs([])} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>Limpiar</button>
-                    </div>
-                    <div style={{
-                      maxHeight: '120px',
-                      overflowY: 'auto',
-                      background: '#f8fafc',
-                      borderRadius: '8px',
-                      padding: '8px',
-                      fontSize: '0.75rem',
-                      fontFamily: 'monospace',
-                      color: 'var(--text-main)',
-                      border: '1px solid var(--border-color)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px'
-                    }}>
-                      {syncLogs.length === 0 ? (
-                        <span style={{ color: 'var(--text-muted)' }}>Esperando escaneos...</span>
-                      ) : (
-                        syncLogs.map((log, idx) => <div key={idx}>{log}</div>)
-                      )}
-                    </div>
-                  </div>
+
 
                 </div>
 
@@ -1063,7 +1122,7 @@ export default function DashboardPage() {
                       {selectedAssignment.title}
                     </h2>
                     <p className="attendance-subtitle">
-                      Asignatura: {selectedSubject.name} • Código: {selectedSubject.code}
+                      Asignatura: {selectedSubject.name}
                     </p>
                     </div>
                     <div style={{ display: 'flex', gap: '12px' }}>
@@ -1250,20 +1309,23 @@ export default function DashboardPage() {
                   {/* Horizontal / Grid Cards Row */}
                   <div className="subjects-grid">
                     {subjects.map((s, index) => {
-                      const visuals = getSubjectVisuals(s.name, index);
+                      const visuals = getSubjectVisuals(s, index);
                       return (
                         <div 
                           key={s._id} 
                           className={`subject-card ${selectedSubject?._id === s._id ? 'active' : ''}`}
+                          style={{ '--card-color': visuals.color } as React.CSSProperties}
                           onClick={() => {
                             setSelectedSubject(s);
                             setSelectedAssignment(null);
                           }}
                         >
-                          <div className="subject-card-icon-box" style={{ backgroundColor: visuals.bg, color: visuals.color }}>
-                            {visuals.icon}
+                          <div className="subject-card-inner">
+                            <div className="subject-card-icon-box" style={{ backgroundColor: visuals.bg, color: visuals.color }}>
+                              {visuals.icon}
+                            </div>
+                            <div className="subject-card-name">{s.name}</div>
                           </div>
-                          <div className="subject-card-name">{s.name}</div>
                         </div>
                       );
                     })}
@@ -1272,19 +1334,19 @@ export default function DashboardPage() {
                     <div 
                       className="subject-card"
                       style={{ 
+                        '--card-color': '#94a3b8',
                         borderStyle: 'dashed', 
                         borderColor: '#94a3b8', 
-                        justifyContent: 'center', 
-                        alignItems: 'center',
                         background: '#f8fafc',
-                        height: '160px'
-                      }}
+                      } as React.CSSProperties}
                       onClick={() => setShowCreateSubjectModal(true)}
                     >
-                      <div className="subject-card-icon-box" style={{ backgroundColor: '#f1f5f9', color: '#64748b' }}>
-                        <Plus size={24} />
+                      <div className="subject-card-inner" style={{ alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        <div className="subject-card-icon-box" style={{ backgroundColor: '#f1f5f9', color: '#94a3b8' }}>
+                          <Plus size={24} />
+                        </div>
+                        <div className="subject-card-name" style={{ color: '#94a3b8', marginTop: '8px' }}>Crear Asignatura</div>
                       </div>
-                      <div className="subject-card-name" style={{ color: '#64748b', fontSize: '1.1rem', marginTop: '12px' }}>Crear Asignatura</div>
                     </div>
                   </div>
 
@@ -1381,7 +1443,9 @@ export default function DashboardPage() {
                     borderRadius: '16px',
                     background: 'white',
                     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                    border: '1px solid var(--border-color)'
+                    border: '1px solid var(--border-color)',
+                    maxHeight: '90vh',
+                    overflowY: 'auto'
                   }}>
                     <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Plus size={20} color="#0284c7" />
@@ -1390,7 +1454,34 @@ export default function DashboardPage() {
                     <form onSubmit={async (e) => {
                       await handleCreateSubject(e);
                       setShowCreateSubjectModal(false);
+                      setNewSubjectIcon('BookOpen');
+                      setNewSubjectColor('#0284c7');
                     }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+                      {/* Live preview card */}
+                      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '4px' }}>
+                        <div style={{
+                          width: '130px', minHeight: '140px',
+                          background: SUBJECT_COLOR_OPTIONS.find(c => c.color === newSubjectColor)?.bg || '#e0f2fe',
+                          borderRadius: '16px', display: 'flex', flexDirection: 'column',
+                          alignItems: 'center', justifyContent: 'center', gap: '10px',
+                          padding: '18px 12px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+                          border: `2px solid ${newSubjectColor}22`
+                        }}>
+                          <div style={{
+                            width: '48px', height: '48px', borderRadius: '12px',
+                            background: `${newSubjectColor}22`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: newSubjectColor
+                          }}>
+                            {SUBJECT_ICON_OPTIONS.find(i => i.key === newSubjectIcon)?.node || <BookOpen size={24} />}
+                          </div>
+                          <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#1e293b', textAlign: 'center', wordBreak: 'break-word' }}>
+                            {newSubjectName || 'Mi Asignatura'}
+                          </div>
+                        </div>
+                      </div>
+
                       <div className="form-group" style={{ margin: 0 }}>
                         <label className="form-label" style={{ fontWeight: 700 }}>Nombre de la Asignatura</label>
                         <input
@@ -1403,17 +1494,6 @@ export default function DashboardPage() {
                         />
                       </div>
                       <div className="form-group" style={{ margin: 0 }}>
-                        <label className="form-label" style={{ fontWeight: 700 }}>Clave / Código</label>
-                        <input
-                          type="text"
-                          required
-                          className="form-input"
-                          placeholder="MAT-101"
-                          value={newSubjectCode}
-                          onChange={(e) => setNewSubjectCode(e.target.value)}
-                        />
-                      </div>
-                      <div className="form-group" style={{ margin: 0 }}>
                         <label className="form-label" style={{ fontWeight: 700 }}>Descripción (Opcional)</label>
                         <input
                           type="text"
@@ -1423,6 +1503,57 @@ export default function DashboardPage() {
                           onChange={(e) => setNewSubjectDesc(e.target.value)}
                         />
                       </div>
+
+                      {/* Icon picker */}
+                      <div>
+                        <label className="form-label" style={{ fontWeight: 700, display: 'block', marginBottom: '8px' }}>Ícono</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                          {SUBJECT_ICON_OPTIONS.map(opt => (
+                            <button
+                              key={opt.key}
+                              type="button"
+                              title={opt.label}
+                              onClick={() => setNewSubjectIcon(opt.key)}
+                              style={{
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                gap: '4px', padding: '10px 6px', borderRadius: '10px', border: '2px solid',
+                                borderColor: newSubjectIcon === opt.key ? newSubjectColor : 'transparent',
+                                background: newSubjectIcon === opt.key ? `${newSubjectColor}15` : '#f8fafc',
+                                color: newSubjectIcon === opt.key ? newSubjectColor : '#64748b',
+                                cursor: 'pointer', transition: 'all 0.15s', fontSize: '0.62rem', fontWeight: 600
+                              }}
+                            >
+                              {opt.node}
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Color picker */}
+                      <div>
+                        <label className="form-label" style={{ fontWeight: 700, display: 'block', marginBottom: '8px' }}>Color</label>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {SUBJECT_COLOR_OPTIONS.map(opt => (
+                            <button
+                              key={opt.color}
+                              type="button"
+                              title={opt.label}
+                              onClick={() => setNewSubjectColor(opt.color)}
+                              style={{
+                                width: '32px', height: '32px', borderRadius: '50%',
+                                background: opt.bg, border: '3px solid',
+                                borderColor: newSubjectColor === opt.color ? opt.color : 'transparent',
+                                cursor: 'pointer', transition: 'transform 0.15s, border-color 0.15s',
+                                transform: newSubjectColor === opt.color ? 'scale(1.18)' : 'scale(1)',
+                                outline: newSubjectColor === opt.color ? `2px solid ${opt.color}44` : 'none',
+                                outlineOffset: '2px'
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
                       <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
                         <button 
                           type="button" 
@@ -1435,7 +1566,7 @@ export default function DashboardPage() {
                         <button 
                           type="submit" 
                           className="btn btn-primary"
-                          style={{ flex: 1, padding: '12px', background: '#0284c7' }}
+                          style={{ flex: 1, padding: '12px', background: newSubjectColor }}
                         >
                           Crear Asignatura
                         </button>
@@ -1467,7 +1598,9 @@ export default function DashboardPage() {
                     borderRadius: '16px',
                     background: 'white',
                     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                    border: '1px solid var(--border-color)'
+                    border: '1px solid var(--border-color)',
+                    maxHeight: '90vh',
+                    overflowY: 'auto'
                   }}>
                     <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Plus size={20} color="#0284c7" />
@@ -1736,93 +1869,107 @@ export default function DashboardPage() {
               ) : (
                 
                 /* Standard Students Table and Registration Form */
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
-                  
-                  {/* Form */}
-                  <div className="glass-panel">
-                    <h2 style={{ fontSize: '1.25rem', color: '#0369a1', marginBottom: '20px' }}>Registrar Alumno</h2>
-                    <form onSubmit={handleCreateStudent} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div className="form-group" style={{ margin: 0 }}>
-                        <label className="form-label">Nombre del Estudiante</label>
-                        <input
-                          type="text"
-                          required
-                          className="form-input"
-                          placeholder="Ej. Carlos Mendoza"
-                          value={newStudentName}
-                          onChange={(e) => setNewStudentName(e.target.value)}
-                        />
-                      </div>
-                      <div className="form-group" style={{ margin: 0 }}>
-                        <label className="form-label">Matrícula Escolar</label>
-                        <input
-                          type="text"
-                          required
-                          className="form-input"
-                          placeholder="Ej. 24890"
-                          value={newStudentEnrollment}
-                          onChange={(e) => setNewStudentEnrollment(e.target.value)}
-                        />
-                      </div>
-                      <button type="submit" className="btn btn-primary" style={{ marginTop: '8px' }}>
-                        Registrar en Plataforma
-                      </button>
-                    </form>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <h2 className="attendance-title" style={{ fontSize: '2.2rem', marginBottom: '4px', color: '#0f172a' }}>
+                        Gestión de Alumnos
+                      </h2>
+                      <p className="attendance-subtitle">
+                        Registra nuevos alumnos y consulta su historial de asistencia y tareas
+                      </p>
+                    </div>
                   </div>
 
-                  {/* List */}
-                  <div className="glass-panel">
-                    <h2 style={{ fontSize: '1.25rem', color: '#0369a1', marginBottom: '20px' }}>Alumnos Vinculados</h2>
-                    {filteredStudents.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                        No hay estudiantes registrados.
-                      </div>
-                    ) : (
-                      <div className="custom-table-container">
-                        <table className="custom-table">
-                          <thead>
-                            <tr>
-                              <th>Nombre</th>
-                              <th>Matrícula</th>
-                              <th>Código de QR</th>
-                              <th style={{ textAlign: 'center' }}>Acciones</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredStudents.map(std => (
-                              <tr key={std._id}>
-                                <td style={{ fontWeight: 600 }}>{std.name}</td>
-                                <td>{std.enrollmentNumber || '-'}</td>
-                                <td style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{std.qrCode}</td>
-                                <td>
-                                  <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
-                                    <button 
-                                      className="btn btn-secondary" 
-                                      style={{ padding: '4px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                      onClick={() => {
-                                        setSelectedStudentDetail(std);
-                                        fetchStudentSummary(std._id);
-                                      }}
-                                    >
-                                      <Eye size={14} /> Inspeccionar
-                                    </button>
-                                    <button 
-                                      className="btn btn-secondary" 
-                                      style={{ padding: '4px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                      onClick={() => setActiveQrStudent(std)}
-                                    >
-                                      <QrCode size={14} /> QR
-                                    </button>
-                                  </div>
-                                </td>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
+                    
+                    {/* Form */}
+                    <div className="glass-panel">
+                      <h2 style={{ fontSize: '1.25rem', color: '#0369a1', marginBottom: '20px' }}>Registrar Alumno</h2>
+                      <form onSubmit={handleCreateStudent} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label">Nombre del Estudiante</label>
+                          <input
+                            type="text"
+                            required
+                            className="form-input"
+                            placeholder="Ej. Carlos Mendoza"
+                            value={newStudentName}
+                            onChange={(e) => setNewStudentName(e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label">Matrícula Escolar</label>
+                          <input
+                            type="text"
+                            required
+                            className="form-input"
+                            placeholder="Ej. 24890"
+                            value={newStudentEnrollment}
+                            onChange={(e) => setNewStudentEnrollment(e.target.value)}
+                          />
+                        </div>
+                        <button type="submit" className="btn btn-primary" style={{ marginTop: '8px' }}>
+                          Registrar en Plataforma
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* List */}
+                    <div className="glass-panel">
+                      <h2 style={{ fontSize: '1.25rem', color: '#0369a1', marginBottom: '20px' }}>Alumnos Vinculados</h2>
+                      {filteredStudents.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                          No hay estudiantes registrados.
+                        </div>
+                      ) : (
+                        <div className="custom-table-container">
+                          <table className="custom-table">
+                            <thead>
+                              <tr>
+                                <th>Nombre</th>
+                                <th>Matrícula</th>
+                                <th>Código de QR</th>
+                                <th style={{ textAlign: 'center' }}>Acciones</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
+                            </thead>
+                            <tbody>
+                              {filteredStudents.map(std => (
+                                <tr key={std._id}>
+                                  <td style={{ fontWeight: 600 }}>{std.name}</td>
+                                  <td>{std.enrollmentNumber || '-'}</td>
+                                  <td style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{std.qrCode}</td>
+                                  <td>
+                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
+                                      <button 
+                                        className="btn btn-secondary" 
+                                        style={{ padding: '4px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                        onClick={() => {
+                                          setSelectedStudentDetail(std);
+                                          fetchStudentSummary(std._id);
+                                        }}
+                                      >
+                                        <Eye size={14} /> Inspeccionar
+                                      </button>
+                                      <button 
+                                        className="btn btn-secondary" 
+                                        style={{ padding: '4px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                        onClick={() => setActiveQrStudent(std)}
+                                      >
+                                        <QrCode size={14} /> QR
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
 
+                  </div>
                 </div>
               )}
 
@@ -1961,24 +2108,119 @@ export default function DashboardPage() {
 
           {/* TAB: Settings */}
           {activeTab === 'settings' && (
-            <div className="glass-panel" style={{ maxWidth: '600px', margin: '0 auto' }}>
-              <h2 style={{ fontSize: '1.25rem', color: '#0369a1', marginBottom: '20px' }}>Información de la Cuenta</h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Profesora</span>
-                  <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>{teacher?.name}</span>
+                  <h2 className="attendance-title" style={{ fontSize: '2.2rem', marginBottom: '4px', color: '#0f172a' }}>
+                    Configuración de Cuenta
+                  </h2>
+                  <p className="attendance-subtitle">
+                    Administra los detalles de tu cuenta y actualiza tu contraseña de acceso
+                  </p>
                 </div>
-                <div>
-                  <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Institución Educativa</span>
-                  <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>{teacher?.schoolName}</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'start' }}>
+                {/* Account Details */}
+                <div className="glass-panel" style={{ padding: '28px' }}>
+                  <h3 style={{ fontSize: '1.25rem', color: '#0369a1', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <User size={18} /> Detalles Personales
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>Profesora</span>
+                      <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>{teacher?.name}</span>
+                    </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>Institución Educativa</span>
+                      <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>{teacher?.schoolName}</span>
+                    </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>Correo Electrónico</span>
+                      <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>{teacher?.email}</span>
+                    </div>
+                    <div>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>Identificador único</span>
+                      <span style={{ fontSize: '0.85rem', fontFamily: 'monospace', color: '#64748b' }}>{teacher?.teacherId}</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Correo Electrónico</span>
-                  <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>{teacher?.email}</span>
-                </div>
-                <div>
-                  <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Identificador de Tenant</span>
-                  <span style={{ fontSize: '0.9rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{teacher?.teacherId}</span>
+
+                {/* Change Password Form */}
+                <div className="glass-panel" style={{ padding: '28px' }}>
+                  <h3 style={{ fontSize: '1.25rem', color: '#0369a1', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    Cambiar Contraseña
+                  </h3>
+
+                  {changePasswordError && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '10px', color: '#ef4444', fontSize: '0.85rem', fontWeight: 600, marginBottom: '16px' }}>
+                      <ShieldAlert size={16} />
+                      {changePasswordError}
+                    </div>
+                  )}
+
+                  {changePasswordSuccess && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: '#f0fdf4', border: '1px solid #dcfce7', borderRadius: '10px', color: '#16a34a', fontSize: '0.85rem', fontWeight: 600, marginBottom: '16px' }}>
+                      <Check size={16} />
+                      {changePasswordSuccess}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label" style={{ fontWeight: 700 }}>Contraseña Actual</label>
+                      <input
+                        type="password"
+                        required
+                        className="form-input"
+                        placeholder="••••••••"
+                        value={oldPassword}
+                        onChange={(e) => setOldPassword(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label" style={{ fontWeight: 700 }}>Nueva Contraseña</label>
+                      <input
+                        type="password"
+                        required
+                        className="form-input"
+                        placeholder="Mínimo 6 caracteres"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label" style={{ fontWeight: 700 }}>Confirmar Nueva Contraseña</label>
+                      <input
+                        type="password"
+                        required
+                        className="form-input"
+                        placeholder="Repite la nueva contraseña"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={changePasswordLoading}
+                      className="btn btn-primary"
+                      style={{
+                        marginTop: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        background: '#0284c7'
+                      }}
+                    >
+                      {changePasswordLoading && <RefreshCw size={16} className="spin" />}
+                      {changePasswordLoading ? 'Actualizando...' : 'Actualizar Contraseña'}
+                    </button>
+                  </form>
                 </div>
               </div>
             </div>

@@ -2,8 +2,11 @@ import './globals.css';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'School Sync Suite - Automatización Escolar',
+  title: 'EducaQR - Control Académico Inteligente',
   description: 'Control académico en tiempo real con escaneo QR',
+  icons: {
+    icon: '/logo-circle.png',
+  },
 };
 
 export default function RootLayout({
