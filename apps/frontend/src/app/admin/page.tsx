@@ -232,7 +232,7 @@ export default function AdminPage() {
 
         {/* CONTENT BODY */}
         <div className="content-body">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
+          <div className="responsive-split-1-2">
             
             {/* Form */}
             <div className="glass-panel">
