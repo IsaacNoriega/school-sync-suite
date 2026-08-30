@@ -23,6 +23,7 @@ export default function ScannerPage() {
   const [scanMode, setScanMode] = useState<'attendance' | 'grades'>('attendance');
   const [subjects, setSubjects] = useState<any[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [students, setStudents] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState('');
   const [gradingScore, setGradingScore] = useState<number>(10);
@@ -87,6 +88,7 @@ export default function ScannerPage() {
       initialSubId = params.get('subjectId') || '';
     }
     fetchSubjects(savedToken, initialSubId);
+    fetchStudents(savedToken);
   }, [router]);
 
   // Load assignments when subject changes
@@ -250,6 +252,20 @@ export default function ScannerPage() {
     }
   };
 
+  const fetchStudents = async (authToken: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/students`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setStudents(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const fetchAssignments = async (authToken: string, subjectId: string, initialAssignmentId?: string) => {
     try {
       const response = await fetch(`${API_BASE_URL}/assignments?subjectId=${subjectId}`, {
@@ -294,11 +310,12 @@ export default function ScannerPage() {
         body.score = gradingScore;
       }
 
+      const activeToken = localStorage.getItem('token') || token;
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${activeToken}`
         },
         body: JSON.stringify(body)
       });
@@ -340,7 +357,8 @@ export default function ScannerPage() {
       toast.error(errMsg);
       
       // If server scan fails, we can add it to the offline queue as fallback
-      const studentName = qrCodeString.startsWith('STUDENT-') ? `Alumno ${qrCodeString.split('-')[1] || 'Temp'}` : 'Código Escaneado';
+      const foundStudent = students.find(s => s.qrCode === qrCodeString);
+      const studentName = foundStudent ? foundStudent.name : (qrCodeString.startsWith('STUDENT-') ? `Alumno ${qrCodeString.split('-')[3] || qrCodeString.split('-')[1] || 'Temp'}` : 'Código Escaneado');
       const newOfflineItem = {
         mode: scanMode,
         qrCode: qrCodeString,
@@ -662,14 +680,14 @@ export default function ScannerPage() {
         }}>
           {scanMode === 'attendance' ? (
             <span>
-              📅 Registrando asistencia en:{' '}
+              📅{' '}
               <strong style={{ color: '#38bdf8' }}>
                 {activeSubject ? `${activeSubject.name} (${activeSubject.code})` : 'Cargando materia...'}
               </strong>
             </span>
           ) : (
             <span>
-              🎯 Asignando notas en:{' '}
+              🎯{' '}
               <strong style={{ color: '#38bdf8' }}>
                 {activeSubject ? activeSubject.name : 'Cargando materia...'}
               </strong>
@@ -975,59 +993,7 @@ export default function ScannerPage() {
         </div>
       </div>
 
-      {/* Floating Manual QR Input Block */}
-      {showManualInput && (
-        <div style={{
-          margin: '0 24px 16px 24px',
-          background: 'rgba(30, 41, 59, 0.9)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: '16px',
-          padding: '12px 16px',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: '0 10px 20px rgba(0,0,0,0.3)',
-          zIndex: 10
-        }}>
-          <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <input
-              type="text"
-              style={{
-                flex: 1,
-                padding: '10px 14px',
-                background: 'rgba(15, 23, 42, 0.6)',
-                color: 'white',
-                border: '1px solid rgba(255,255,255,0.1)',
-                fontSize: '0.85rem',
-                borderRadius: '8px',
-                outline: 'none'
-              }}
-              placeholder="Ingresa matrícula (Ej. STUDENT-101)"
-              value={manualQrCode}
-              onChange={(e) => setManualQrCode(e.target.value)}
-            />
-            <button
-              type="submit"
-              style={{
-                padding: '10px 16px',
-                background: '#0284c7',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: 700,
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'background 0.2s'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#0270a9'}
-              onMouseLeave={(e) => e.currentTarget.style.background = '#0284c7'}
-            >
-              Simular
-            </button>
-          </form>
-        </div>
-      )}
+
 
       {/* Bottom Sheet Action Panel matching the image exactly */}
       <div style={{
@@ -1053,47 +1019,14 @@ export default function ScannerPage() {
           </p>
         </div>
 
-        {/* 3 Column Action Panel */}
+        {/* 2 Column Action Panel */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: 'repeat(2, 1fr)',
           alignItems: 'center',
           justifyContent: 'center',
           textAlign: 'center'
         }}>
-          
-          {/* Left Column: Manual entry drawer toggler */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <button 
-              onClick={() => setShowManualInput(prev => !prev)}
-              style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                background: showManualInput ? '#0284c7' : '#f1f5f9',
-                border: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: showManualInput ? 'white' : '#64748b',
-                cursor: 'pointer',
-                marginBottom: '8px',
-                transition: 'all 0.2s',
-                boxShadow: showManualInput ? '0 4px 10px rgba(2, 132, 199, 0.3)' : 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!showManualInput) e.currentTarget.style.background = '#e2e8f0';
-              }}
-              onMouseLeave={(e) => {
-                if (!showManualInput) e.currentTarget.style.background = '#f1f5f9';
-              }}
-            >
-              <Zap size={20} />
-            </button>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>
-              Simular QR
-            </span>
-          </div>
 
           {/* Center Column: Flashlight */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

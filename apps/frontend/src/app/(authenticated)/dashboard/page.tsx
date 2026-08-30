@@ -668,18 +668,26 @@ export default function DashboardPage() {
 
   // --- Filtering Lists by Search ---
 
-  const filteredStudents = students.filter(student => 
-    student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (student.enrollmentNumber && student.enrollmentNumber.includes(searchQuery))
-  );
+  const filteredStudents = Array.isArray(students)
+    ? students.filter(student => 
+        student && student.name && (
+          student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (student.enrollmentNumber && student.enrollmentNumber.includes(searchQuery))
+        )
+      )
+    : [];
 
-  const filteredAttendance = attendanceList.filter(item => 
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredAttendance = Array.isArray(attendanceList)
+    ? attendanceList.filter(item => 
+        item && item.name && item.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [];
 
-  const filteredGrades = gradeList.filter(item => 
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredGrades = Array.isArray(gradeList)
+    ? gradeList.filter(item => 
+        item && item.name && item.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [];
 
   return (
     <>
@@ -1181,7 +1189,7 @@ export default function DashboardPage() {
                     <div style={{ color: 'var(--error)', padding: '20px', textAlign: 'center' }}>
                       {errorAssignments}
                     </div>
-                  ) : assignments.filter(a => (a.subject?._id || a.subject) === selectedSubject._id).length === 0 ? (
+                  ) : (Array.isArray(assignments) ? assignments : []).filter(a => a && (a.subject?._id || a.subject) === selectedSubject._id).length === 0 ? (
                     <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
                       <p style={{ marginBottom: '12px', fontSize: '0.95rem' }}>No hay tareas creadas para esta asignatura.</p>
                       <button 
@@ -1196,7 +1204,7 @@ export default function DashboardPage() {
                     <div className="glass-panel" style={{ padding: '24px' }}>
                       <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>Tareas Disponibles</h4>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-                        {assignments.filter(a => (a.subject?._id || a.subject) === selectedSubject._id).map((assignment) => (
+                        {(Array.isArray(assignments) ? assignments : []).filter(a => a && (a.subject?._id || a.subject) === selectedSubject._id).map((assignment) => (
                           <div
                             key={assignment._id}
                             onClick={() => setSelectedAssignment(assignment)}
