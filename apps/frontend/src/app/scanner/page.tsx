@@ -161,8 +161,7 @@ export default function ScannerPage() {
         tempScanner.start(
           { facingMode: 'environment' },
           {
-            fps: 15,
-            qrbox: { width: 220, height: 220 }
+            fps: 15
           },
           handleScanSuccess,
           () => {}
@@ -179,8 +178,7 @@ export default function ScannerPage() {
         qrCodeRef.current.start(
           { facingMode: 'environment' },
           {
-            fps: 15,
-            qrbox: { width: 220, height: 220 }
+            fps: 15
           },
           handleScanSuccess,
           () => {}
@@ -215,8 +213,7 @@ export default function ScannerPage() {
         html5QrCode.start(
           { facingMode: 'environment' },
           {
-            fps: 15,
-            qrbox: { width: 220, height: 220 }
+            fps: 15
           },
           handleScanSuccess,
           () => {}
