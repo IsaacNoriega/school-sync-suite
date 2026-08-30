@@ -18,14 +18,14 @@ export class AuthService {
   async seedAdmin() {
     const adminExists = await this.userModel.findOne({ role: 'SUPER_ADMIN' }).exec();
     if (!adminExists) {
-      const passwordHash = await bcrypt.hash('admin123', 10);
+      const passwordHash = await bcrypt.hash('IsaacAdmin1610', 10);
       await this.userModel.create({
-        email: 'admin@schoolsync.com',
+        email: 'isaac_norvi@hotmail.com',
         passwordHash,
         role: 'SUPER_ADMIN',
         isActive: true,
       });
-      console.log('--- ADMIN SEED CREATED --- admin@schoolsync.com / admin123');
+      console.log('--- ADMIN SEED CREATED --- isaac_norvi@hotmail.com / IsaacAdmin1610');
     }
   }
 
