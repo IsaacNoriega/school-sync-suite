@@ -5,6 +5,7 @@ import {
   Plus, UserX, School, User, Search, RefreshCw, AlertCircle, CheckCircle2
 } from 'lucide-react';
 import { useLayout } from '../layout-context';
+import { API_BASE_URL } from '@/config/api';
 
 export default function AdminPage() {
   const { token, searchQuery } = useLayout();
@@ -32,7 +33,7 @@ export default function AdminPage() {
     setLoading(true);
     setFetchError('');
     try {
-      const response = await fetch('http://localhost:3001/auth/teachers', {
+      const response = await fetch(`${API_BASE_URL}/auth/teachers`, {
         headers: {
           'Authorization': `Bearer ${authToken}`
         }
@@ -58,7 +59,7 @@ export default function AdminPage() {
     setSubmitting(true);
 
     try {
-      const response = await fetch('http://localhost:3001/auth/register-teacher', {
+      const response = await fetch(`${API_BASE_URL}/auth/register-teacher`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -88,7 +89,7 @@ export default function AdminPage() {
 
   const handleToggleStatus = async (userId: string, currentStatus: boolean) => {
     try {
-      const response = await fetch(`http://localhost:3001/auth/teachers/${userId}/status`, {
+      const response = await fetch(`${API_BASE_URL}/auth/teachers/${userId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

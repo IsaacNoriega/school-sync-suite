@@ -10,6 +10,7 @@ import {
 // We import html5-qrcode dynamically because it accesses window/navigator and is client-side only
 import { Html5Qrcode } from 'html5-qrcode';
 import toast from 'react-hot-toast';
+import { API_BASE_URL } from '@/config/api';
 
 export default function ScannerPage() {
   const router = useRouter();
@@ -235,7 +236,7 @@ export default function ScannerPage() {
 
   const fetchSubjects = async (authToken: string, initialSubjectId?: string) => {
     try {
-      const response = await fetch('http://localhost:3001/subjects', {
+      const response = await fetch(`${API_BASE_URL}/subjects`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await response.json();
@@ -251,7 +252,7 @@ export default function ScannerPage() {
 
   const fetchAssignments = async (authToken: string, subjectId: string, initialAssignmentId?: string) => {
     try {
-      const response = await fetch(`http://localhost:3001/assignments?subjectId=${subjectId}`, {
+      const response = await fetch(`${API_BASE_URL}/assignments?subjectId=${subjectId}`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await response.json();
@@ -285,10 +286,10 @@ export default function ScannerPage() {
       let body: any = { qrCode: qrCodeString };
 
       if (scanMode === 'attendance') {
-        endpoint = 'http://localhost:3001/attendance/scan';
+        endpoint = `${API_BASE_URL}/attendance/scan`;
         body.subjectId = selectedSubjectId;
       } else {
-        endpoint = 'http://localhost:3001/grades/scan';
+        endpoint = `${API_BASE_URL}/grades/scan`;
         body.assignmentId = selectedAssignmentId;
         body.score = gradingScore;
       }
@@ -395,10 +396,10 @@ export default function ScannerPage() {
         const body: any = { qrCode: item.qrCode };
 
         if (item.mode === 'attendance') {
-          endpoint = 'http://localhost:3001/attendance/scan';
+          endpoint = `${API_BASE_URL}/attendance/scan`;
           body.subjectId = item.subjectId;
         } else {
-          endpoint = 'http://localhost:3001/grades/scan';
+          endpoint = `${API_BASE_URL}/grades/scan`;
           body.assignmentId = item.assignmentId;
           body.score = item.score;
         }
