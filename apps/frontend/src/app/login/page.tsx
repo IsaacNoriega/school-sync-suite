@@ -186,10 +186,6 @@ export default function LoginPage() {
             {loading ? 'Iniciando Sesión...' : 'Entrar al Portal'}
           </button>
         </form>
-
-        <div style={{ marginTop: '20px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-          <span>Credenciales semilla: <strong>admin@schoolsync.com</strong> / <strong>admin123</strong></span>
-        </div>
       </div>
     </div>
   );
