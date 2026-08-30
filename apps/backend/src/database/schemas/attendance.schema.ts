@@ -25,3 +25,5 @@ export class Attendance extends Document {
 }
 
 export const AttendanceSchema = SchemaFactory.createForClass(Attendance);
+AttendanceSchema.index({ student: 1, date: 1 }, { unique: true });
+

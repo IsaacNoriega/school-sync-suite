@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Subject, SubjectDocument } from '../../database/schemas/subject.schema';
@@ -10,6 +10,11 @@ export class SubjectsService {
   ) {}
 
   async create(teacherId: string, name: string, description?: string) {
+    const existingSubject = await this.subjectModel.findOne({ teacher: teacherId, name }).lean().exec();
+    if (existingSubject) {
+      throw new ConflictException('Ya tienes una asignatura registrada con este nombre.');
+    }
+
     const prefix = name
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
@@ -33,11 +38,11 @@ export class SubjectsService {
   }
 
   async findAll(teacherId: string) {
-    return this.subjectModel.find({ teacher: teacherId }).exec();
+    return this.subjectModel.find({ teacher: teacherId }).lean().exec();
   }
 
   async findOne(teacherId: string, id: string) {
-    const subject = await this.subjectModel.findById(id).exec();
+    const subject = await this.subjectModel.findById(id).lean().exec();
     if (!subject) {
       throw new NotFoundException('Subject not found');
     }
@@ -49,6 +54,17 @@ export class SubjectsService {
 
   async update(teacherId: string, id: string, name?: string, code?: string, description?: string) {
     await this.findOne(teacherId, id);
+    if (name) {
+      const existingSubject = await this.subjectModel.findOne({
+        teacher: teacherId,
+        name,
+        _id: { $ne: id }
+      }).lean().exec();
+      if (existingSubject) {
+        throw new ConflictException('Ya tienes una asignatura registrada con este nombre.');
+      }
+    }
+
     return this.subjectModel.findByIdAndUpdate(
       id,
       { name, code, description },
