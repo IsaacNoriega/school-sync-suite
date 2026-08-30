@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 // We import html5-qrcode dynamically because it accesses window/navigator and is client-side only
 import { Html5Qrcode } from 'html5-qrcode';
+import toast from 'react-hot-toast';
 
 export default function ScannerPage() {
   const router = useRouter();
@@ -320,6 +321,8 @@ export default function ScannerPage() {
       setScanStatus('success');
       setStatusMessage('');
 
+      toast.success(`${studentName}: ${scanMode === 'attendance' ? 'Asistencia' : `Nota: ${scoreDisplay} pts`}`);
+
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate(200);
       }
@@ -331,7 +334,9 @@ export default function ScannerPage() {
 
     } catch (err: any) {
       setScanStatus('error');
-      setStatusMessage(err.message || 'Código QR no reconocido');
+      const errMsg = err.message || 'Código QR no reconocido';
+      setStatusMessage(errMsg);
+      toast.error(errMsg);
       
       // If server scan fails, we can add it to the offline queue as fallback
       const studentName = qrCodeString.startsWith('STUDENT-') ? `Alumno ${qrCodeString.split('-')[1] || 'Temp'}` : 'Código Escaneado';
@@ -379,6 +384,7 @@ export default function ScannerPage() {
   const handleSyncQueue = async () => {
     if (offlineQueue.length === 0) return;
     setIsSyncing(true);
+    const loadToast = toast.loading('Sincronizando cola de escaneos...');
     
     let successCount = 0;
     const failedItems: any[] = [];
@@ -422,9 +428,11 @@ export default function ScannerPage() {
     if (failedItems.length === 0) {
       setScanStatus('success');
       setStatusMessage(`¡Sincronización exitosa! Se subieron ${successCount} registros.`);
+      toast.success(`¡Sincronización exitosa! Se subieron ${successCount} registros.`, { id: loadToast });
     } else {
       setScanStatus('error');
       setStatusMessage(`Sincronización parcial: ${successCount} subidos, ${failedItems.length} fallidos.`);
+      toast.error(`Sincronización parcial: ${successCount} subidos, ${failedItems.length} fallidos.`, { id: loadToast });
     }
 
     setTimeout(() => {

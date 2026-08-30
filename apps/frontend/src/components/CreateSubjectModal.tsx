@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { 
   X, Plus, BookOpen, Calculator, FileText, FlaskConical, Globe, Users, Award, CheckSquare 
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface CreateSubjectModalProps {
   isOpen: boolean;
@@ -49,15 +50,19 @@ export default function CreateSubjectModal({
     e.preventDefault();
     setError('');
     setSubmitting(true);
+    const loadToast = toast.loading('Creando asignatura...');
     try {
       await onSubmit({ name, description, iconKey, color });
       setName('');
       setDescription('');
       setIconKey('BookOpen');
       setColor('#0284c7');
+      toast.success('¡Asignatura registrada correctamente!', { id: loadToast });
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Error al crear la asignatura');
+      const errMsg = err.message || 'Error al crear la asignatura';
+      setError(errMsg);
+      toast.error(errMsg, { id: loadToast });
     } finally {
       setSubmitting(false);
     }

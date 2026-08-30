@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Key, Mail, ShieldAlert } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -35,6 +36,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
+    const loadToast = toast.loading('Iniciando sesión...');
 
     try {
       const response = await fetch('http://localhost:3001/auth/login', {
@@ -55,13 +57,17 @@ export default function LoginPage() {
       localStorage.setItem('token', data.access_token);
       localStorage.setItem('user', JSON.stringify(data.user));
 
+      toast.success('¡Sesión iniciada con éxito!', { id: loadToast });
+
       if (data.user.role === 'SUPER_ADMIN') {
         router.push('/admin');
       } else {
         router.push('/dashboard');
       }
     } catch (err: any) {
-      setError(err.message || 'Credenciales inválidas o error de red');
+      const errMsg = err.message || 'Credenciales inválidas o error de red';
+      setError(errMsg);
+      toast.error(errMsg, { id: loadToast });
     } finally {
       setLoading(false);
     }

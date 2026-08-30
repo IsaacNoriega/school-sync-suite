@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Plus } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface CreateAssignmentModalProps {
   isOpen: boolean;
@@ -25,15 +26,19 @@ export default function CreateAssignmentModal({
     e.preventDefault();
     setError('');
     setSubmitting(true);
+    const loadToast = toast.loading('Creando tarea...');
     try {
       await onSubmit({ title, description, maxScore, dueDate });
       setTitle('');
       setDescription('');
       setMaxScore(10);
       setDueDate('');
+      toast.success('¡Tarea registrada correctamente!', { id: loadToast });
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Error al crear la tarea');
+      const errMsg = err.message || 'Error al crear la tarea';
+      setError(errMsg);
+      toast.error(errMsg, { id: loadToast });
     } finally {
       setSubmitting(false);
     }
