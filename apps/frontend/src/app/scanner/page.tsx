@@ -49,6 +49,8 @@ export default function ScannerPage() {
   } | null>(null);
 
   const qrCodeRef = useRef<Html5Qrcode | null>(null);
+  // Debounce: track last scanned code + timestamp to avoid duplicate scans
+  const lastScannedRef = useRef<{ code: string; time: number }>({ code: '', time: 0 });
 
   // Parse query string client-side safely
   useEffect(() => {
@@ -382,8 +384,17 @@ export default function ScannerPage() {
     }
   };
 
+  const SCAN_COOLDOWN_MS = 3000; // ms to ignore the same QR code again
+
   const handleScanSuccess = (decodedText: string) => {
+    const now = Date.now();
+    const last = lastScannedRef.current;
+    // Block if same code scanned within cooldown window
+    if (decodedText === last.code && now - last.time < SCAN_COOLDOWN_MS) {
+      return;
+    }
     if (scanStatus === 'idle') {
+      lastScannedRef.current = { code: decodedText, time: now };
       processScan(decodedText);
     }
   };
@@ -542,32 +553,6 @@ export default function ScannerPage() {
         </div>
 
         <div style={{ display: 'flex', gap: '8px' }}>
-          {/* File Upload Button */}
-          <label 
-            style={{ 
-              background: 'rgba(255,255,255,0.1)', 
-              border: 'none', 
-              borderRadius: '50%', 
-              width: '40px', 
-              height: '40px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              color: 'white',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-          >
-            <Image size={18} />
-            <input 
-              type="file" 
-              accept="image/*" 
-              onChange={handleFileScan} 
-              style={{ display: 'none' }} 
-            />
-          </label>
 
           {/* Config Drawer Toggle */}
           <button 
