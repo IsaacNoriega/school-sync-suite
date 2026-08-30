@@ -8,6 +8,7 @@ import {
   Calendar, BookOpen, Users, LogOut, Award, Settings, Bell, HelpCircle, Search, Menu, X, ShieldAlert, School, GraduationCap
 } from 'lucide-react';
 import { LayoutContext } from './layout-context';
+import { API_BASE_URL } from '@/config/api';
 
 export default function AuthenticatedLayout({
   children,
@@ -74,7 +75,7 @@ export default function AuthenticatedLayout({
 
       const connectSocket = () => {
         if (!socketConnection) {
-          const conn = io('http://localhost:3001');
+          const conn = io(API_BASE_URL);
           socketConnection = conn;
           setSocket(conn);
 

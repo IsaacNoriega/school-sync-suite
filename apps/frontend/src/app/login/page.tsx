@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Key, Mail, ShieldAlert } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { API_BASE_URL } from '@/config/api';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -39,7 +40,7 @@ export default function LoginPage() {
     const loadToast = toast.loading('Iniciando sesión...');
 
     try {
-      const response = await fetch('http://localhost:3001/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

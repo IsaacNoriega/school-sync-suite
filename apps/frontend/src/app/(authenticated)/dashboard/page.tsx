@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 
 import { useLayout } from '../layout-context';
+import { API_BASE_URL } from '@/config/api';
 import StatCard from '@/components/StatCard';
 import SubjectCard from '@/components/SubjectCard';
 import CreateSubjectModal, { SUBJECT_ICON_OPTIONS, SUBJECT_COLOR_OPTIONS } from '@/components/CreateSubjectModal';
@@ -186,7 +187,7 @@ export default function DashboardPage() {
     setLoadingSubjects(true);
     setErrorSubjects('');
     try {
-      const response = await fetch('http://localhost:3001/subjects', {
+      const response = await fetch(`${API_BASE_URL}/subjects`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await response.json();
@@ -210,7 +211,7 @@ export default function DashboardPage() {
     setLoadingStudents(true);
     setErrorStudents('');
     try {
-      const response = await fetch('http://localhost:3001/students', {
+      const response = await fetch(`${API_BASE_URL}/students`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await response.json();
@@ -232,7 +233,7 @@ export default function DashboardPage() {
     setStudentSummaryLoading(true);
     setStudentSummaryError('');
     try {
-      const response = await fetch(`http://localhost:3001/students/${studentId}/summary`, {
+      const response = await fetch(`${API_BASE_URL}/students/${studentId}/summary`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -253,7 +254,7 @@ export default function DashboardPage() {
     setLoadingAssignments(true);
     setErrorAssignments('');
     try {
-      const response = await fetch(`http://localhost:3001/assignments?subjectId=${subjectId}`, {
+      const response = await fetch(`${API_BASE_URL}/assignments?subjectId=${subjectId}`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await response.json();
@@ -274,7 +275,7 @@ export default function DashboardPage() {
     setLoadingAttendance(true);
     setErrorAttendance('');
     try {
-      const response = await fetch(`http://localhost:3001/attendance/daily?subjectId=${subjectId}&date=${date}`, {
+      const response = await fetch(`${API_BASE_URL}/attendance/daily?subjectId=${subjectId}&date=${date}`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await response.json();
@@ -295,7 +296,7 @@ export default function DashboardPage() {
     setLoadingGrades(true);
     setErrorGrades('');
     try {
-      const response = await fetch(`http://localhost:3001/grades/assignment?assignmentId=${assignmentId}`, {
+      const response = await fetch(`${API_BASE_URL}/grades/assignment?assignmentId=${assignmentId}`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await response.json();
@@ -315,7 +316,7 @@ export default function DashboardPage() {
   // --- API Action Handlers ---
 
   const handleCreateSubjectSubmit = async (newSubject: { name: string; description: string; iconKey: string; color: string }) => {
-    const response = await fetch('http://localhost:3001/subjects', {
+    const response = await fetch(`${API_BASE_URL}/subjects`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -335,7 +336,7 @@ export default function DashboardPage() {
 
   const handleCreateAssignmentSubmit = async (newAssignment: { title: string; description: string; maxScore: number; dueDate: string }) => {
     if (!selectedSubject) return;
-    const response = await fetch('http://localhost:3001/assignments', {
+    const response = await fetch(`${API_BASE_URL}/assignments`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -359,7 +360,7 @@ export default function DashboardPage() {
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:3001/students', {
+      const response = await fetch(`${API_BASE_URL}/students`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -385,7 +386,7 @@ export default function DashboardPage() {
   const handleUpdateAttendanceManual = async (studentId: string, status: 'PRESENT' | 'ABSENT' | 'LATE') => {
     const subId = selectedSubject?._id || 'global';
     try {
-      const response = await fetch('http://localhost:3001/attendance/manual', {
+      const response = await fetch(`${API_BASE_URL}/attendance/manual`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -419,7 +420,7 @@ export default function DashboardPage() {
   const handleUpdateGradeManual = async (studentId: string, score: number) => {
     if (!selectedAssignment) return;
     try {
-      const response = await fetch('http://localhost:3001/grades/manual', {
+      const response = await fetch(`${API_BASE_URL}/grades/manual`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -456,7 +457,7 @@ export default function DashboardPage() {
   const handleMarkAllPresent = async () => {
     const subId = selectedSubject?._id || 'global';
     try {
-      const response = await fetch('http://localhost:3001/attendance/mark-all-present', {
+      const response = await fetch(`${API_BASE_URL}/attendance/mark-all-present`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -497,7 +498,7 @@ export default function DashboardPage() {
 
     setChangePasswordLoading(true);
     try {
-      const response = await fetch('http://localhost:3001/auth/change-password', {
+      const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -577,7 +578,7 @@ export default function DashboardPage() {
 
     // Save to disk
     try {
-      await fetch(`http://localhost:3001/assignments/${selectedAssignment._id}/export`, {
+      await fetch(`${API_BASE_URL}/assignments/${selectedAssignment._id}/export`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -635,7 +636,7 @@ export default function DashboardPage() {
 
     // Save to disk
     try {
-      await fetch(`http://localhost:3001/students/${selectedStudentDetail._id}/export`, {
+      await fetch(`${API_BASE_URL}/students/${selectedStudentDetail._id}/export`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
