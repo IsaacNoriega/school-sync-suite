@@ -30,13 +30,7 @@ export default function ScannerPage() {
   const [showConfig, setShowConfig] = useState(false);
   const [showQueueModal, setShowQueueModal] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [offlineQueue, setOfflineQueue] = useState<any[]>([
-    { qrCode: 'STUDENT-101', name: 'Juan Pérez', date: 'Hoy, 09:40 AM' },
-    { qrCode: 'STUDENT-102', name: 'María Gómez', date: 'Hoy, 09:41 AM' },
-    { qrCode: 'STUDENT-103', name: 'Carlos López', date: 'Hoy, 09:41 AM' },
-    { qrCode: 'STUDENT-104', name: 'Ana Martínez', date: 'Hoy, 09:42 AM' },
-    { qrCode: 'STUDENT-105', name: 'Luis Rodríguez', date: 'Hoy, 09:43 AM' },
-  ]);
+  const [offlineQueue, setOfflineQueue] = useState<any[]>([]);
 
   // Scan simulation fallback
   const [manualQrCode, setManualQrCode] = useState('');
@@ -111,6 +105,27 @@ export default function ScannerPage() {
       setShowConfig(true);
     }
   }, [scanMode, selectedAssignmentId]);
+
+  // Load offline queue from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedQueue = localStorage.getItem('offlineQueue');
+      if (savedQueue) {
+        try {
+          setOfflineQueue(JSON.parse(savedQueue));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+  }, []);
+
+  // Save offline queue to localStorage when it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('offlineQueue', JSON.stringify(offlineQueue));
+    }
+  }, [offlineQueue]);
 
   // File Scanning handler
   const handleFileScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -321,9 +336,13 @@ export default function ScannerPage() {
       // If server scan fails, we can add it to the offline queue as fallback
       const studentName = qrCodeString.startsWith('STUDENT-') ? `Alumno ${qrCodeString.split('-')[1] || 'Temp'}` : 'Código Escaneado';
       const newOfflineItem = {
+        mode: scanMode,
         qrCode: qrCodeString,
         name: studentName,
-        date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        subjectId: selectedSubjectId,
+        assignmentId: selectedAssignmentId,
+        score: gradingScore
       };
       
       setOfflineQueue(prev => [newOfflineItem, ...prev]);
@@ -361,18 +380,57 @@ export default function ScannerPage() {
     if (offlineQueue.length === 0) return;
     setIsSyncing(true);
     
-    // Simulate cloud uploading logs
-    setTimeout(() => {
-      setIsSyncing(false);
-      setOfflineQueue([]);
-      setShowQueueModal(false);
+    let successCount = 0;
+    const failedItems: any[] = [];
+
+    for (const item of offlineQueue) {
+      try {
+        let endpoint = '';
+        const body: any = { qrCode: item.qrCode };
+
+        if (item.mode === 'attendance') {
+          endpoint = 'http://localhost:3001/attendance/scan';
+          body.subjectId = item.subjectId;
+        } else {
+          endpoint = 'http://localhost:3001/grades/scan';
+          body.assignmentId = item.assignmentId;
+          body.score = item.score;
+        }
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+          throw new Error('Sync failed');
+        }
+        successCount++;
+      } catch (err) {
+        failedItems.push(item);
+      }
+    }
+
+    setIsSyncing(false);
+    setOfflineQueue(failedItems);
+    setShowQueueModal(false);
+
+    if (failedItems.length === 0) {
       setScanStatus('success');
-      setStatusMessage('¡Sincronización de cola completada con éxito!');
-      setTimeout(() => {
-        setScanStatus('idle');
-        setStatusMessage('');
-      }, 3000);
-    }, 2550);
+      setStatusMessage(`¡Sincronización exitosa! Se subieron ${successCount} registros.`);
+    } else {
+      setScanStatus('error');
+      setStatusMessage(`Sincronización parcial: ${successCount} subidos, ${failedItems.length} fallidos.`);
+    }
+
+    setTimeout(() => {
+      setScanStatus('idle');
+      setStatusMessage('');
+    }, 4000);
   };
 
   const activeSubject = subjects.find(s => s._id === selectedSubjectId);
