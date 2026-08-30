@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Outfit } from 'next/font/google';
+import { Toaster } from 'react-hot-toast';
 import SecurityProvider from '@/components/SecurityProvider';
 
 const outfit = Outfit({
@@ -27,6 +28,20 @@ export default function RootLayout({
       <body>
         <SecurityProvider>
           {children}
+          <Toaster 
+            position="top-center" 
+            reverseOrder={false}
+            toastOptions={{
+              style: {
+                background: '#1e293b',
+                color: '#fff',
+                fontSize: '0.9rem',
+                fontFamily: 'var(--font-outfit), sans-serif',
+                borderRadius: '12px',
+                border: '1px solid rgba(255,255,255,0.08)'
+              }
+            }}
+          />
         </SecurityProvider>
       </body>
     </html>
