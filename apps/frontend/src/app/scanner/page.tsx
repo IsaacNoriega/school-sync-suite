@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  ArrowLeft, Calendar, Award, CheckCircle, ShieldAlert, 
+  ArrowLeft, Calendar, Award, CheckCircle, ShieldAlert, AlertCircle,
   Send, Flashlight, X, ClipboardList, RefreshCw, Database,
   Sliders, Zap, User, Clock, Check, ClipboardCheck, Image
 } from 'lucide-react';
@@ -40,6 +40,7 @@ export default function ScannerPage() {
 
   // Scan simulation fallback
   const [manualQrCode, setManualQrCode] = useState('');
+  const [showManualInput, setShowManualInput] = useState(false);
 
   // Scanning feedback
   const [scanStatus, setScanStatus] = useState<'idle' | 'success' | 'error' | 'loading'>('idle');
@@ -103,6 +104,13 @@ export default function ScannerPage() {
       fetchAssignments(token, selectedSubjectId, initialAssId);
     }
   }, [selectedSubjectId, scanMode, token]);
+
+  // Auto-open config drawer when entering grades mode if no task is selected
+  useEffect(() => {
+    if (scanMode === 'grades' && !selectedAssignmentId) {
+      setShowConfig(true);
+    }
+  }, [scanMode, selectedAssignmentId]);
 
   // File Scanning handler
   const handleFileScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -286,7 +294,6 @@ export default function ScannerPage() {
 
       const formattedTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
       
-      // Attendance returns populated student obj; grades returns populated student obj
       const studentName = data?.student?.name || data?.studentName || 'Alumno';
       const scoreDisplay = data?.score ?? gradingScore;
       
@@ -296,10 +303,16 @@ export default function ScannerPage() {
         time: formattedTime
       });
       setScanStatus('success');
+      setStatusMessage('');
 
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate(200);
       }
+
+      setTimeout(() => {
+        setScanStatus('idle');
+        setScannedData(null);
+      }, 2500);
 
     } catch (err: any) {
       setScanStatus('error');
@@ -411,7 +424,7 @@ export default function ScannerPage() {
         justifyContent: 'space-between', 
         padding: '20px 24px', 
         zIndex: 10,
-        background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0) 100%)'
+        background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(15, 23, 42, 0) 100%)'
       }}>
         <button 
           onClick={() => router.push('/dashboard')} 
@@ -425,32 +438,26 @@ export default function ScannerPage() {
             alignItems: 'center', 
             justifyContent: 'center',
             color: 'white',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            transition: 'all 0.2s'
           }}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
         >
-          <X size={20} />
+          <ArrowLeft size={20} />
         </button>
 
         <div style={{ textAlign: 'center' }}>
-          <h1 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, letterSpacing: '0.5px' }}>
-            Escáner Activo
+          <h1 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: '#f8fafc', letterSpacing: '0.5px' }}>
+            Escáner QR
           </h1>
-          <span style={{ 
-            fontSize: '0.8rem', 
-            fontWeight: 600, 
-            color: '#38bdf8', 
-            textTransform: 'uppercase',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-            marginTop: '2px'
-          }}>
-            {scanMode === 'attendance' ? 'Asistencia General' : `Calificar ${activeSubject ? `• ${activeSubject.name}` : ''}`}
-          </span>
+          <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>
+            EducaQR inteligente
+          </p>
         </div>
 
         <div style={{ display: 'flex', gap: '8px' }}>
-          {/* File Upload Icon Button */}
+          {/* File Upload Button */}
           <label 
             style={{ 
               background: 'rgba(255,255,255,0.1)', 
@@ -477,6 +484,7 @@ export default function ScannerPage() {
             />
           </label>
 
+          {/* Config Drawer Toggle */}
           <button 
             onClick={() => setShowConfig(prev => !prev)}
             style={{ 
@@ -492,11 +500,126 @@ export default function ScannerPage() {
               cursor: 'pointer',
               transition: 'all 0.2s'
             }}
+            onMouseEnter={(e) => {
+              if (!showConfig) e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+            }}
+            onMouseLeave={(e) => {
+              if (!showConfig) e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+            }}
           >
             <Sliders size={18} />
           </button>
         </div>
       </header>
+
+      {/* Segmented Mode Selector & Context Status Banner */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 10 }}>
+        {/* Segmented Selector */}
+        <div style={{
+          display: 'flex',
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(12px)',
+          borderRadius: '16px',
+          padding: '4px',
+          margin: '0 24px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
+        }}>
+          <button
+            onClick={() => {
+              setScanMode('attendance');
+              setScanStatus('idle');
+              setStatusMessage('');
+            }}
+            style={{
+              flex: 1,
+              padding: '10px 0',
+              borderRadius: '12px',
+              background: scanMode === 'attendance' ? '#0284c7' : 'transparent',
+              border: 'none',
+              color: scanMode === 'attendance' ? 'white' : '#94a3b8',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}
+          >
+            <ClipboardCheck size={16} />
+            Asistencias
+          </button>
+          <button
+            onClick={() => {
+              setScanMode('grades');
+              setScanStatus('idle');
+              setStatusMessage('');
+            }}
+            style={{
+              flex: 1,
+              padding: '10px 0',
+              borderRadius: '12px',
+              background: scanMode === 'grades' ? '#0284c7' : 'transparent',
+              border: 'none',
+              color: scanMode === 'grades' ? 'white' : '#94a3b8',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}
+          >
+            <Award size={16} />
+            Calificaciones
+          </button>
+        </div>
+
+        {/* Status context banner */}
+        <div style={{
+          background: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '12px',
+          padding: '8px 16px',
+          margin: '0 24px',
+          border: '1px solid rgba(255, 255, 255, 0.05)',
+          fontSize: '0.8rem',
+          color: '#e2e8f0',
+          textAlign: 'center',
+          fontWeight: 600,
+          boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+        }}>
+          {scanMode === 'attendance' ? (
+            <span>
+              📅 Registrando asistencia en:{' '}
+              <strong style={{ color: '#38bdf8' }}>
+                {activeSubject ? `${activeSubject.name} (${activeSubject.code})` : 'Cargando materia...'}
+              </strong>
+            </span>
+          ) : (
+            <span>
+              🎯 Asignando notas en:{' '}
+              <strong style={{ color: '#38bdf8' }}>
+                {activeSubject ? activeSubject.name : 'Cargando materia...'}
+              </strong>
+              {activeAssignment ? (
+                <>
+                  {' • '}Tarea:{' '}
+                  <strong style={{ color: '#fbbf24' }}>
+                    {activeAssignment.title} ({gradingScore} pts)
+                  </strong>
+                </>
+              ) : (
+                <span style={{ color: '#f87171' }}> (Falta elegir tarea en configuración ⚙️)</span>
+              )}
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* Expandable Configuration Drawer */}
       {showConfig && (
@@ -506,17 +629,19 @@ export default function ScannerPage() {
           padding: '20px 24px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px',
+          gap: '14px',
           zIndex: 9,
-          backdropFilter: 'blur(8px)'
+          backdropFilter: 'blur(10px)',
+          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)',
+          animation: 'slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
         }}>
           <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label" style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 700 }}>MATERIA</label>
+            <label className="form-label" style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em' }}>SELECCIONAR MATERIA</label>
             <select 
               value={selectedSubjectId} 
               onChange={(e) => setSelectedSubjectId(e.target.value)}
               className="form-input"
-              style={{ padding: '10px 14px', background: 'rgba(15, 23, 42, 0.6)', color: 'white', border: '1px solid rgba(255,255,255,0.1)' }}
+              style={{ padding: '10px 14px', background: 'rgba(15, 23, 42, 0.6)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
             >
               {subjects.map(s => <option key={s._id} value={s._id} style={{color: '#000'}}>{s.name} ({s.code})</option>)}
             </select>
@@ -525,7 +650,7 @@ export default function ScannerPage() {
           {scanMode === 'grades' && (
             <div style={{ display: 'flex', gap: '12px' }}>
               <div className="form-group" style={{ margin: 0, flex: 2 }}>
-                <label className="form-label" style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 700 }}>TAREA A CALIFICAR</label>
+                <label className="form-label" style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em' }}>TAREA A EVALUAR</label>
                 <select 
                   value={selectedAssignmentId} 
                   onChange={(e) => {
@@ -534,10 +659,10 @@ export default function ScannerPage() {
                     if (task) setGradingScore(task.maxScore);
                   }}
                   className="form-input"
-                  style={{ padding: '10px 14px', background: 'rgba(15, 23, 42, 0.6)', color: 'white', border: '1px solid rgba(255,255,255,0.1)' }}
+                  style={{ padding: '10px 14px', background: 'rgba(15, 23, 42, 0.6)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
                 >
                   {assignments.length === 0 ? (
-                    <option value="">No hay tareas para esta materia</option>
+                    <option value="">No hay tareas registradas</option>
                   ) : (
                     assignments.map(a => <option key={a._id} value={a._id} style={{color: '#000'}}>{a.title}</option>)
                   )}
@@ -545,11 +670,11 @@ export default function ScannerPage() {
               </div>
               
               <div className="form-group" style={{ margin: 0, flex: 1 }}>
-                <label className="form-label" style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 700 }}>PUNTAJE</label>
+                <label className="form-label" style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em' }}>PUNTOS</label>
                 <input 
                   type="number" 
                   className="form-input" 
-                  style={{ padding: '10px 14px', textAlign: 'center', background: 'rgba(15, 23, 42, 0.6)', color: 'white', border: '1px solid rgba(255,255,255,0.1)' }}
+                  style={{ padding: '10px 14px', textAlign: 'center', background: 'rgba(15, 23, 42, 0.6)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
                   value={gradingScore}
                   min={0}
                   onChange={(e) => setGradingScore(parseFloat(e.target.value) || 0)}
@@ -560,7 +685,93 @@ export default function ScannerPage() {
         </div>
       )}
 
-      {/* Camera Scanning Area */}
+      {/* Floating Success Toast HUD */}
+      {scanStatus === 'success' && scannedData && (
+        <div style={{
+          position: 'fixed',
+          top: '130px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 'calc(100% - 48px)',
+          maxWidth: '380px',
+          background: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '20px',
+          padding: '16px 20px',
+          boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '14px',
+          zIndex: 999,
+          border: '1px solid rgba(16, 185, 129, 0.2)',
+          color: '#0f172a'
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            background: '#dcfce7',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <Check size={20} color="#16a34a" strokeWidth={3} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.95rem', fontWeight: 800 }}>{scannedData.studentName}</div>
+            <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
+              {scannedData.action}
+            </div>
+          </div>
+          <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, alignSelf: 'flex-start' }}>
+            {scannedData.time}
+          </div>
+        </div>
+      )}
+
+      {/* Floating Error Toast HUD */}
+      {scanStatus === 'error' && (
+        <div style={{
+          position: 'fixed',
+          top: '130px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 'calc(100% - 48px)',
+          maxWidth: '380px',
+          background: 'rgba(239, 68, 68, 0.95)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '20px',
+          padding: '16px 20px',
+          boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '14px',
+          zIndex: 999,
+          color: 'white'
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            background: 'rgba(255, 255, 255, 0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <ShieldAlert size={20} color="white" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.95rem', fontWeight: 800 }}>Error de Lectura</div>
+            <div style={{ fontSize: '0.8rem', opacity: 0.95, fontWeight: 600, marginTop: '2px' }}>
+              {statusMessage}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Camera Viewport Area */}
       <div style={{ 
         flex: 1, 
         display: 'flex', 
@@ -582,48 +793,37 @@ export default function ScannerPage() {
           }} />
         )}
 
-        {/* Verification Status Overlay */}
-        {scanStatus !== 'idle' && (
+        {/* Verification Loader Indicator */}
+        {scanStatus === 'loading' && (
           <div style={{
             position: 'absolute',
-            top: '20px',
-            left: '20px',
-            right: '20px',
-            bottom: '20px',
             zIndex: 10,
             borderRadius: '24px',
-            background: scanStatus === 'success' ? 'rgba(16, 185, 129, 0.95)' : 
-                        scanStatus === 'error' ? 'rgba(239, 68, 68, 0.95)' : 'rgba(15, 23, 42, 0.95)',
+            background: 'rgba(15, 23, 42, 0.85)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
-            padding: '30px',
+            padding: '24px 32px',
             textAlign: 'center',
             backdropFilter: 'blur(6px)',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)'
+            boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
           }}>
-            {scanStatus === 'success' && <CheckCircle size={64} style={{ marginBottom: '15px', color: '#34d399' }} />}
-            {scanStatus === 'error' && <ShieldAlert size={64} style={{ marginBottom: '15px', color: '#f87171' }} />}
-            {scanStatus === 'loading' && <div style={{
-              width: '50px',
-              height: '50px',
+            <div style={{
+              width: '40px',
+              height: '40px',
               border: '4px solid rgba(255,255,255,0.2)',
               borderTopColor: '#38bdf8',
               borderRadius: '50%',
               animation: 'spin 1s linear infinite',
-              marginBottom: '15px'
-            }} />}
-            
-            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '8px' }}>
-              {scanStatus === 'success' ? '¡Escaneado!' : scanStatus === 'error' ? 'Error' : 'Verificando'}
-            </h3>
-            <p style={{ fontSize: '1rem', fontWeight: 500, opacity: 0.9 }}>{statusMessage}</p>
+              marginBottom: '12px'
+            }} />
+            <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>Procesando código QR...</span>
           </div>
         )}
 
-        {/* Immersive Scanning Box layout matching image */}
+        {/* Viewfinder overlay layout */}
         <div style={{ 
           position: 'relative', 
           width: '100%', 
@@ -634,86 +834,33 @@ export default function ScannerPage() {
           justifyContent: 'center' 
         }}>
           
-          {/* html5-qrcode reader element goes behind */}
+          {/* Viewfinder frame or Warning card if no assignment is selected */}
           {(scanMode === 'attendance' || (scanMode === 'grades' && selectedAssignmentId)) ? (
-            <div style={{ width: '100%', height: '100%', borderRadius: '24px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)', background: 'transparent' }}></div>
+            <div style={{ width: '100%', height: '100%', borderRadius: '24px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent' }}></div>
           ) : (
             <div style={{ 
               width: '100%', 
               height: '100%', 
-              background: '#1e293b', 
+              background: 'rgba(30, 41, 59, 0.85)', 
+              backdropFilter: 'blur(8px)',
               borderRadius: '24px', 
               display: 'flex', 
               flexDirection: 'column', 
               alignItems: 'center', 
               justifyContent: 'center',
               border: '1px solid rgba(255,255,255,0.1)',
-              padding: '24px',
+              padding: '28px',
               textAlign: 'center'
             }}>
-              <div style={{ width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left' }}>
-                <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-                  <Zap size={36} color="#38bdf8" style={{ marginBottom: '8px', opacity: 0.9 }} />
-                  <h4 style={{ margin: 0, fontSize: '1rem', color: '#f1f5f9' }}>Configurar Escáner</h4>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>
-                    Selecciona los datos para iniciar
-                  </p>
-                </div>
-
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label" style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em' }}>MATERIA</label>
-                  <select 
-                    value={selectedSubjectId} 
-                    onChange={(e) => setSelectedSubjectId(e.target.value)}
-                    className="form-input"
-                    style={{ padding: '8px 12px', background: 'rgba(15, 23, 42, 0.8)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', fontSize: '0.85rem', width: '100%', borderRadius: '8px' }}
-                  >
-                    <option value="" style={{color: '#000'}}>-- Seleccionar Materia --</option>
-                    {subjects.map(s => <option key={s._id} value={s._id} style={{color: '#000'}}>{s.name} ({s.code})</option>)}
-                  </select>
-                </div>
-
-                {scanMode === 'grades' && (
-                  <>
-                    <div className="form-group" style={{ margin: 0 }}>
-                      <label className="form-label" style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em' }}>TAREA A CALIFICAR</label>
-                      <select 
-                        value={selectedAssignmentId} 
-                        onChange={(e) => {
-                          setSelectedAssignmentId(e.target.value);
-                          const task = assignments.find(t => t._id === e.target.value);
-                          if (task) setGradingScore(task.maxScore);
-                        }}
-                        className="form-input"
-                        style={{ padding: '8px 12px', background: 'rgba(15, 23, 42, 0.8)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', fontSize: '0.85rem', width: '100%', borderRadius: '8px' }}
-                      >
-                        <option value="" style={{color: '#000'}}>-- Seleccionar Tarea --</option>
-                        {assignments.length === 0 ? (
-                          <option value="" style={{color: '#000'}} disabled>No hay tareas para esta materia</option>
-                        ) : (
-                          assignments.map(a => <option key={a._id} value={a._id} style={{color: '#000'}}>{a.title}</option>)
-                        )}
-                      </select>
-                    </div>
-                    
-                    <div className="form-group" style={{ margin: 0 }}>
-                      <label className="form-label" style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em' }}>PUNTAJE A ASIGNAR</label>
-                      <input 
-                        type="number" 
-                        className="form-input" 
-                        style={{ padding: '8px 12px', textAlign: 'center', background: 'rgba(15, 23, 42, 0.8)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', fontSize: '0.85rem', width: '100%', borderRadius: '8px' }}
-                        value={gradingScore}
-                        min={0}
-                        onChange={(e) => setGradingScore(parseFloat(e.target.value) || 0)}
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
+              <AlertCircle size={44} color="#fbbf24" style={{ marginBottom: '14px' }} />
+              <h4 style={{ margin: 0, fontSize: '1rem', color: '#f8fafc', fontWeight: 800 }}>Módulo de Calificaciones</h4>
+              <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: '#94a3b8', lineHeight: '1.4', fontWeight: 500 }}>
+                Selecciona una tarea en la configuración (⚙️) para activar la cámara del lector.
+              </p>
             </div>
           )}
           
-          {/* Overlay elements */}
+          {/* Corner frame overlays */}
           {(scanMode === 'attendance' || (scanMode === 'grades' && selectedAssignmentId)) && (
             <div style={{
               position: 'absolute',
@@ -727,26 +874,27 @@ export default function ScannerPage() {
             }}>
               {/* Instructions pill */}
               <div style={{
-                background: 'rgba(15, 23, 42, 0.85)',
+                background: 'rgba(15, 23, 42, 0.8)',
                 color: '#f1f5f9',
-                padding: '8px 16px',
+                padding: '6px 14px',
                 borderRadius: '20px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
+                fontSize: '0.75rem',
+                fontWeight: 700,
                 marginBottom: '20px',
                 backdropFilter: 'blur(4px)',
-                border: '1px solid rgba(255,255,255,0.1)'
+                border: '1px solid rgba(255,255,255,0.1)',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
               }}>
-                Alinea el código QR dentro del recuadro
+                Alinea el código QR en el centro
               </div>
 
               {/* Blue Corner Scanning Frame matching the screenshot */}
               <div className="qr-scanner-frame" style={{
                 position: 'relative',
-                width: '220px',
-                height: '220px',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '20px',
+                width: '210px',
+                height: '210px',
+                border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: '24px',
                 boxShadow: '0 0 0 9999px rgba(15, 23, 42, 0.65)' /* Immersive darken effect */
               }}>
                 <div className="qr-corner corner-tl" />
@@ -760,27 +908,59 @@ export default function ScannerPage() {
         </div>
       </div>
 
-      {/* Manual Code Simulator Input in a drawer form */}
-      <div style={{ padding: '0 24px', marginBottom: '10px' }}>
-        <details style={{ background: 'rgba(30, 41, 59, 0.4)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <summary style={{ padding: '12px', fontSize: '0.8rem', color: '#94a3b8', cursor: 'pointer', fontWeight: 600 }}>
-            Simular Escaneo Manual
-          </summary>
-          <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '8px', padding: '0 12px 12px 12px' }}>
+      {/* Floating Manual QR Input Block */}
+      {showManualInput && (
+        <div style={{
+          margin: '0 24px 16px 24px',
+          background: 'rgba(30, 41, 59, 0.9)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          padding: '12px 16px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 10px 20px rgba(0,0,0,0.3)',
+          zIndex: 10
+        }}>
+          <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <input
               type="text"
-              className="form-input"
-              style={{ padding: '8px 12px', background: 'rgba(15, 23, 42, 0.8)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.85rem' }}
-              placeholder="Ej. STUDENT-101"
+              style={{
+                flex: 1,
+                padding: '10px 14px',
+                background: 'rgba(15, 23, 42, 0.6)',
+                color: 'white',
+                border: '1px solid rgba(255,255,255,0.1)',
+                fontSize: '0.85rem',
+                borderRadius: '8px',
+                outline: 'none'
+              }}
+              placeholder="Ingresa matrícula (Ej. STUDENT-101)"
               value={manualQrCode}
               onChange={(e) => setManualQrCode(e.target.value)}
             />
-            <button type="submit" className="btn btn-primary" style={{ padding: '8px 14px', background: '#0284c7' }}>
-              <Send size={14} />
+            <button
+              type="submit"
+              style={{
+                padding: '10px 16px',
+                background: '#0284c7',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#0270a9'}
+              onMouseLeave={(e) => e.currentTarget.style.background = '#0284c7'}
+            >
+              Simular
             </button>
           </form>
-        </details>
-      </div>
+        </div>
+      )}
 
       {/* Bottom Sheet Action Panel matching the image exactly */}
       <div style={{
@@ -793,20 +973,20 @@ export default function ScannerPage() {
         zIndex: 8
       }}>
         
-        {/* Active scan mode configuration visual representation */}
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+        {/* Dynamic scanning title summary */}
+        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
             {scanMode === 'attendance' ? 'Escanear Asistencia' : 'Escanear Tarea'}
           </h3>
-          <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '2px 0 0 0' }}>
+          <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '4px 0 0 0', fontWeight: 500 }}>
             {scanMode === 'attendance' 
-              ? 'Asistencia General'
-              : (activeAssignment ? `Evaluando: ${activeAssignment.title} (${gradingScore} pts)` : 'Tarea no seleccionada')
+              ? 'Registra asistencia escaneando el código del alumno'
+              : (activeAssignment ? `Registrando: ${activeAssignment.title} (${gradingScore} pts)` : 'Elige una tarea para calificar')
             }
           </p>
         </div>
 
-        {/* 3 Column design matching the screenshot */}
+        {/* 3 Column Action Panel */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
@@ -815,39 +995,40 @@ export default function ScannerPage() {
           textAlign: 'center'
         }}>
           
-          {/* Left Column: Toggle Mode (Calificar / Asistencia) */}
+          {/* Left Column: Manual entry drawer toggler */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <button 
-              onClick={() => {
-                setScanMode(prev => prev === 'attendance' ? 'grades' : 'attendance');
-                setScanStatus('idle');
-                setStatusMessage('');
-              }}
+              onClick={() => setShowManualInput(prev => !prev)}
               style={{
                 width: '48px',
                 height: '48px',
                 borderRadius: '50%',
-                background: '#f1f5f9',
+                background: showManualInput ? '#0284c7' : '#f1f5f9',
                 border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#64748b',
+                color: showManualInput ? 'white' : '#64748b',
                 cursor: 'pointer',
                 marginBottom: '8px',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                boxShadow: showManualInput ? '0 4px 10px rgba(2, 132, 199, 0.3)' : 'none'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
-              onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
+              onMouseEnter={(e) => {
+                if (!showManualInput) e.currentTarget.style.background = '#e2e8f0';
+              }}
+              onMouseLeave={(e) => {
+                if (!showManualInput) e.currentTarget.style.background = '#f1f5f9';
+              }}
             >
-              {scanMode === 'attendance' ? <ClipboardList size={22} /> : <Calendar size={22} />}
+              <Zap size={20} />
             </button>
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>
-              {scanMode === 'attendance' ? 'Calificar' : 'Asistencias'}
+              Simular QR
             </span>
           </div>
 
-          {/* Center Column: Flashlight (Linterna) */}
+          {/* Center Column: Flashlight */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <button 
               onClick={() => setIsTorchOn(prev => !prev)}
@@ -863,7 +1044,7 @@ export default function ScannerPage() {
                 color: 'white',
                 cursor: 'pointer',
                 marginBottom: '8px',
-                boxShadow: isTorchOn ? '0 0 20px #0284c7' : '0 10px 15px -3px rgba(2, 132, 199, 0.4)',
+                boxShadow: isTorchOn ? '0 0 20px rgba(2, 132, 199, 0.6)' : '0 10px 15px -3px rgba(2, 132, 199, 0.3)',
                 transition: 'all 0.2s',
                 transform: isTorchOn ? 'scale(0.95)' : 'scale(1)'
               }}
@@ -896,7 +1077,7 @@ export default function ScannerPage() {
                 onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
                 onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
               >
-                <Database size={22} />
+                <Database size={20} />
               </button>
               {offlineQueue.length > 0 && (
                 <span style={{
@@ -1016,151 +1197,6 @@ export default function ScannerPage() {
                 {isSyncing ? 'Subiendo escaneos a la nube...' : 'Sincronizar y Subir'}
               </button>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Success Scan Modal Overlay */}
-      {scanStatus === 'success' && scannedData && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.7)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: '20px',
-          fontFamily: 'var(--font-outfit), sans-serif'
-        }}>
-          <div style={{
-            width: '100%',
-            maxWidth: '340px',
-            background: 'white',
-            borderRadius: '24px',
-            overflow: 'hidden',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.3)'
-          }}>
-            {/* Header Section */}
-            <div style={{
-              background: '#f1f5f9',
-              padding: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderBottom: '1px solid #e2e8f0'
-            }}>
-              <div style={{
-                width: '56px',
-                height: '56px',
-                borderRadius: '50%',
-                background: '#dcfce7',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: '12px'
-              }}>
-                <Check size={28} color="#16a34a" strokeWidth={3} />
-              </div>
-              <h2 style={{
-                fontSize: '1.15rem',
-                fontWeight: 700,
-                color: '#0f172a',
-                margin: 0,
-                textAlign: 'center'
-              }}>
-                Escaneo Exitoso
-              </h2>
-            </div>
-
-            {/* Body Section */}
-            <div style={{
-              padding: '24px 24px 16px 24px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '20px'
-            }}>
-              {/* Item: Alumno */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-                <div style={{ color: '#64748b', marginTop: '3px' }}>
-                  <User size={20} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Alumno</div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
-                    {scannedData.studentName}
-                  </div>
-                </div>
-              </div>
-
-              {/* Thin Line separator */}
-              <div style={{ borderBottom: '1px solid #f1f5f9' }} />
-
-              {/* Item: Acción */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-                <div style={{ color: '#64748b', marginTop: '3px' }}>
-                  <ClipboardCheck size={20} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Acción</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 600, color: '#0f172a', marginTop: '2px' }}>
-                    {scannedData.action}
-                  </div>
-                </div>
-              </div>
-
-              {/* Item: Hora */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-                <div style={{ color: '#64748b', marginTop: '3px' }}>
-                  <Clock size={20} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Hora</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 600, color: '#0f172a', marginTop: '2px' }}>
-                    {scannedData.time}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer Section */}
-            <div style={{
-              background: '#f8fafc',
-              padding: '16px 20px',
-              borderTop: '1px solid #f1f5f9',
-              display: 'flex',
-              justifyContent: 'center'
-            }}>
-              <button
-                onClick={() => {
-                  setScanStatus('idle');
-                  setStatusMessage('');
-                  setScannedData(null);
-                }}
-                style={{
-                  width: '100%',
-                  background: '#025ca2',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '12px',
-                  padding: '14px',
-                  fontSize: '1rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'background 0.2s',
-                  boxShadow: '0 4px 6px -1px rgba(2, 92, 162, 0.2)'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#014c88'}
-                onMouseOut={(e) => e.currentTarget.style.background = '#025ca2'}
-              >
-                Continuar Escaneando
-              </button>
-            </div>
           </div>
         </div>
       )}
