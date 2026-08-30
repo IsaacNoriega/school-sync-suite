@@ -150,10 +150,12 @@ export default function ScannerPage() {
     };
   }, [scanMode, selectedSubjectId, selectedAssignmentId]);
 
-  // Start rear camera feed for fullscreen background
+  // Start rear camera feed for fullscreen background, with dynamic visibility control
   useEffect(() => {
     let active = true;
+
     const startCamera = async () => {
+      if (streamRef.current) return;
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
@@ -169,13 +171,45 @@ export default function ScannerPage() {
         console.warn('No se pudo acceder a la cámara trasera:', err);
       }
     };
-    startCamera();
-    return () => {
-      active = false;
+
+    const stopCamera = () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
         streamRef.current = null;
+        if (videoRef.current) {
+          videoRef.current.srcObject = null;
+        }
       }
+    };
+
+    startCamera();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        startCamera();
+      } else {
+        stopCamera();
+      }
+    };
+
+    const handlePageShow = () => {
+      startCamera();
+    };
+
+    const handlePageHide = () => {
+      stopCamera();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pageshow', handlePageShow);
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      active = false;
+      stopCamera();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('pagehide', handlePageHide);
     };
   }, []);
 
