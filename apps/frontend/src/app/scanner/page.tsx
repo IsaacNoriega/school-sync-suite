@@ -645,47 +645,6 @@ export default function ScannerPage() {
             Calificaciones
           </button>
         </div>
-
-        {/* Status context banner */}
-        <div style={{
-          background: 'rgba(15, 23, 42, 0.6)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: '12px',
-          padding: '8px 16px',
-          margin: '0 24px',
-          border: '1px solid rgba(255, 255, 255, 0.05)',
-          fontSize: '0.8rem',
-          color: '#e2e8f0',
-          textAlign: 'center',
-          fontWeight: 600,
-          boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-        }}>
-          {scanMode === 'attendance' ? (
-            <span>
-              📅{' '}
-              <strong style={{ color: '#38bdf8' }}>
-                {activeSubject ? `${activeSubject.name} (${activeSubject.code})` : 'Cargando materia...'}
-              </strong>
-            </span>
-          ) : (
-            <span>
-              🎯{' '}
-              <strong style={{ color: '#38bdf8' }}>
-                {activeSubject ? activeSubject.name : 'Cargando materia...'}
-              </strong>
-              {activeAssignment ? (
-                <>
-                  {' • '}Tarea:{' '}
-                  <strong style={{ color: '#fbbf24' }}>
-                    {activeAssignment.title} ({gradingScore} pts)
-                  </strong>
-                </>
-              ) : (
-                <span style={{ color: '#f87171' }}> (Falta elegir tarea en configuración ⚙️)</span>
-              )}
-            </span>
-          )}
-        </div>
       </div>
 
       {/* Expandable Configuration Drawer */}

@@ -976,7 +976,7 @@ export default function DashboardPage() {
               <div className="responsive-3col-grid" style={{ marginBottom: '10px' }}>
                 <StatCard 
                   label="Calificados" 
-                  value={gradeList.filter(g => g.score !== null && g.score !== undefined).length} 
+                  value={(Array.isArray(gradeList) ? gradeList : []).filter(g => g.score !== null && g.score !== undefined).length} 
                   icon={<CheckSquare size={20} />} 
                   iconBg="#d1fae5" 
                   iconColor="#10b981" 
@@ -984,7 +984,7 @@ export default function DashboardPage() {
                 />
                 <StatCard 
                   label="Pendientes" 
-                  value={gradeList.filter(g => g.score === null || g.score === undefined).length} 
+                  value={(Array.isArray(gradeList) ? gradeList : []).filter(g => g.score === null || g.score === undefined).length} 
                   icon={<Clock size={20} />} 
                   iconBg="#f1f5f9" 
                   iconColor="#64748b" 
@@ -993,7 +993,8 @@ export default function DashboardPage() {
                 <StatCard 
                   label="Promedio Grupal" 
                   value={(() => {
-                    const graded = gradeList.filter(g => g.score !== null && g.score !== undefined);
+                    const safeGradeList = Array.isArray(gradeList) ? gradeList : [];
+                    const graded = safeGradeList.filter(g => g.score !== null && g.score !== undefined);
                     return graded.length > 0 
                       ? (graded.reduce((acc, curr) => acc + curr.score, 0) / graded.length).toFixed(1) 
                       : '—';
@@ -1026,7 +1027,7 @@ export default function DashboardPage() {
                     <AlertCircle size={24} style={{ margin: '0 auto 10px auto' }} />
                     <div>{errorGrades}</div>
                   </div>
-                ) : gradeList.length === 0 ? (
+                ) : (Array.isArray(gradeList) ? gradeList : []).length === 0 ? (
                   <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px' }}>
                     No hay alumnos registrados en esta materia.
                   </div>
