@@ -45,16 +45,22 @@ async function request(path, options = {}) {
 }
 
 async function run() {
-  console.log('🚀 Iniciando pruebas de validación y seguridad del backend...\n');
+  console.log('🚀 Iniciando pruebas avanzadas de validación, seguridad y autorización del backend...\n');
   const timestamp = Date.now().toString(36).toUpperCase();
   const testEmail = `teacher_${timestamp}@test.com`;
+  const secondEmail = `teacher_sec_${timestamp}@test.com`;
   const testEnrollment = `ENROLL_${timestamp}`;
   const testSubjectName = `Asignatura Test ${timestamp}`;
   const testAssignmentTitle = `Tarea Test ${timestamp}`;
 
   let adminToken = '';
   let teacherToken = '';
+  let secondTeacherToken = '';
   let subjectId = '';
+  let studentId = '';
+  let studentQr = '';
+  let secondStudentQr = '';
+  let assignmentId = '';
 
   // 1. Login Admin
   try {
@@ -94,34 +100,34 @@ async function run() {
     process.exit(1);
   }
 
-  // 3. Registrar nuevo profesor
-  console.log('🧪 Prueba 3: Registrar nuevo profesor para pruebas...');
+  // 3. Registrar nuevo profesor (Teacher 1)
+  console.log('🧪 Prueba 3: Registrar primer profesor para pruebas...');
   const resRegister = await request('/auth/register-teacher', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${adminToken}` },
     body: {
       email: testEmail,
       password: 'password123',
-      name: 'Profesor Test',
-      schoolName: 'Test School'
+      name: 'Profesor Test 1',
+      schoolName: 'Test School 1'
     }
   });
   if (resRegister.status === 201 || resRegister.status === 200) {
-    console.log(`   ✅ Profesor creado: ${testEmail}\n`);
+    console.log(`   ✅ Profesor 1 creado: ${testEmail}\n`);
   } else {
     console.log('   ❌ Error al registrar nuevo profesor:', resRegister.body);
     process.exit(1);
   }
 
-  // 4. Iniciar sesión con nuevo profesor
-  console.log('🧪 Prueba 4: Iniciar sesión con el nuevo profesor...');
+  // 4. Iniciar sesión con primer profesor
+  console.log('🧪 Prueba 4: Iniciar sesión con el primer profesor...');
   const resLoginTeacher = await request('/auth/login', {
     method: 'POST',
     body: { email: testEmail, password: 'password123' }
   });
   if (resLoginTeacher.status === 200 || resLoginTeacher.status === 201) {
     teacherToken = resLoginTeacher.body.access_token;
-    console.log('   ✅ Profesor autenticado correctamente.\n');
+    console.log('   ✅ Profesor 1 autenticado correctamente.\n');
   } else {
     console.log('   ❌ Error al autenticar profesor:', resLoginTeacher.body);
     process.exit(1);
@@ -167,7 +173,7 @@ async function run() {
   }
 
   // 7. Registrar Alumno
-  console.log('🧪 Prueba 7: Registrar un alumno...');
+  console.log('🧪 Prueba 7: Registrar un alumno bajo Profesor 1...');
   const resStudent = await request('/students', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${teacherToken}` },
@@ -177,7 +183,9 @@ async function run() {
     }
   });
   if (resStudent.status === 201 || resStudent.status === 200) {
-    console.log(`   ✅ Alumno registrado con matrícula: ${testEnrollment}\n`);
+    studentId = resStudent.body._id;
+    studentQr = resStudent.body.qrCode;
+    console.log(`   ✅ Alumno registrado. ID: ${studentId}, QR: ${studentQr}\n`);
   } else {
     console.log('   ❌ Error al registrar alumno:', resStudent.body);
     process.exit(1);
@@ -214,7 +222,8 @@ async function run() {
     }
   });
   if (resAssignment.status === 201 || resAssignment.status === 200) {
-    console.log(`   ✅ Tarea registrada con título: ${testAssignmentTitle}\n`);
+    assignmentId = resAssignment.body._id;
+    console.log(`   ✅ Tarea registrada con ID: ${assignmentId}\n`);
   } else {
     console.log('   ❌ Error al registrar tarea:', resAssignment.body);
     process.exit(1);
@@ -240,8 +249,131 @@ async function run() {
     process.exit(1);
   }
 
-  // 11. Rate Limiting (100 req/min)
-  console.log('🧪 Prueba 11: Validar protección contra Rate Limiting (100 req/min)...');
+  // 11. Escanear Asistencia (Caso Exitoso)
+  console.log('🧪 Prueba 11: Escanear asistencia para un alumno propio...');
+  const resAttendance = await request('/attendance/scan', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${teacherToken}` },
+    body: {
+      qrCode: studentQr,
+      subjectId: subjectId
+    }
+  });
+  if (resAttendance.status === 201 || resAttendance.status === 200) {
+    console.log(`   ✅ Asistencia marcada con éxito. Status: ${resAttendance.body.status}\n`);
+  } else {
+    console.log('   ❌ Error al registrar asistencia:', resAttendance.body);
+    process.exit(1);
+  }
+
+  // 12. Registrar y Autenticar Profesor 2 (Para pruebas de autorización)
+  console.log('🧪 Prueba 12: Registrar y autenticar un segundo profesor...');
+  const resRegister2 = await request('/auth/register-teacher', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${adminToken}` },
+    body: {
+      email: secondEmail,
+      password: 'password123',
+      name: 'Profesor Test 2',
+      schoolName: 'Test School 2'
+    }
+  });
+  if (resRegister2.status === 201 || resRegister2.status === 200) {
+    const resLoginTeacher2 = await request('/auth/login', {
+      method: 'POST',
+      body: { email: secondEmail, password: 'password123' }
+    });
+    secondTeacherToken = resLoginTeacher2.body.access_token;
+    
+    // Crear un alumno bajo Profesor 2
+    const resStudent2 = await request('/students', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${secondTeacherToken}` },
+      body: {
+        name: 'Alumno de Profesor 2',
+        enrollmentNumber: `SEC_${testEnrollment}`
+      }
+    });
+    secondStudentQr = resStudent2.body.qrCode;
+    console.log(`   ✅ Profesor 2 autenticado y Alumno 2 registrado con QR: ${secondStudentQr}\n`);
+  } else {
+    console.log('   ❌ Error al registrar segundo profesor:', resRegister2.body);
+    process.exit(1);
+  }
+
+  // 13. Escanear Asistencia de Alumno Ajeno (Caso de Error de Autorización)
+  console.log('🧪 Prueba 13: Intentar marcar asistencia de alumno que pertenece a otro profesor...');
+  const resAttendanceForbidden = await request('/attendance/scan', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${teacherToken}` },
+    body: {
+      qrCode: secondStudentQr,
+      subjectId: subjectId
+    }
+  });
+  if (resAttendanceForbidden.status === 403 && resAttendanceForbidden.body.message === 'This student does not belong to you') {
+    console.log('   ✅ Seguridad comprobada correctamente. Retornó 403 Forbidden esperado.\n');
+  } else {
+    console.log('   ❌ Falla de seguridad: Se permitió registrar asistencia de alumno ajeno. Status:', resAttendanceForbidden.status, 'Body:', resAttendanceForbidden.body);
+    process.exit(1);
+  }
+
+  // 14. Registrar Calificación (Caso Exitoso)
+  console.log('🧪 Prueba 14: Escanear calificación válida para alumno propio...');
+  const resGrade = await request('/grades/scan', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${teacherToken}` },
+    body: {
+      qrCode: studentQr,
+      assignmentId: assignmentId,
+      score: 8.5
+    }
+  });
+  if (resGrade.status === 201 || resGrade.status === 200) {
+    console.log(`   ✅ Calificación registrada con éxito. Puntos: ${resGrade.body.score}\n`);
+  } else {
+    console.log('   ❌ Error al registrar calificación:', resGrade.body);
+    process.exit(1);
+  }
+
+  // 15. Registrar Calificación con Puntaje Superior al Límite Máximo
+  console.log('🧪 Prueba 15: Intentar registrar calificación excediendo los puntos máximos...');
+  const resGradeOverflow = await request('/grades/scan', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${teacherToken}` },
+    body: {
+      qrCode: studentQr,
+      assignmentId: assignmentId,
+      score: 15 // Límite máximo es 10
+    }
+  });
+  if (resGradeOverflow.status === 403 && resGradeOverflow.body.message.startsWith('Score must be between 0 and')) {
+    console.log(`   ✅ Validado correctamente. Retornó 403 Forbidden con mensaje: "${resGradeOverflow.body.message}"\n`);
+  } else {
+    console.log('   ❌ Falla en validación de puntaje máximo. Status:', resGradeOverflow.status, 'Body:', resGradeOverflow.body);
+    process.exit(1);
+  }
+
+  // 16. Calificar Alumno Ajeno (Caso de Error de Autorización)
+  console.log('🧪 Prueba 16: Intentar calificar alumno que pertenece a otro profesor...');
+  const resGradeForbidden = await request('/grades/scan', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${teacherToken}` },
+    body: {
+      qrCode: secondStudentQr,
+      assignmentId: assignmentId,
+      score: 9.0
+    }
+  });
+  if (resGradeForbidden.status === 403 && resGradeForbidden.body.message === 'This student does not belong to you') {
+    console.log('   ✅ Seguridad comprobada correctamente. Retornó 403 Forbidden esperado.\n');
+  } else {
+    console.log('   ❌ Falla de seguridad: Se permitió calificar alumno ajeno. Status:', resGradeForbidden.status, 'Body:', resGradeForbidden.body);
+    process.exit(1);
+  }
+
+  // 17. Rate Limiting (100 req/min)
+  console.log('🧪 Prueba 17: Validar protección contra Rate Limiting (100 req/min)...');
   console.log('   Disparando 105 peticiones rápidas a /health...');
   
   let throttled = false;
@@ -267,7 +399,7 @@ async function run() {
     process.exit(1);
   }
 
-  console.log('🎉 ¡Todas las pruebas han finalizado con éxito! La integridad, validaciones en español y seguridad del backend funcionan a la perfección. 🎉');
+  console.log('🎉 ¡Todas las pruebas avanzadas han finalizado con éxito! La integridad, validaciones en español, seguridad de acceso y restricciones de puntuación del backend funcionan a la perfección. 🎉');
 }
 
 run();
