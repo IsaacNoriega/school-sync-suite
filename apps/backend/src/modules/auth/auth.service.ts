@@ -30,7 +30,7 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto) {
-    const user = await this.userModel.findOne({ email: loginDto.email }).exec();
+    const user = await this.userModel.findOne({ email: loginDto.email }).lean().exec();
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -48,7 +48,7 @@ export class AuthService {
     
     let teacherDetails = null;
     if (user.role === 'TEACHER') {
-      const teacher = await this.teacherModel.findOne({ user: user._id }).exec();
+      const teacher = await this.teacherModel.findOne({ user: user._id }).lean().exec();
       if (teacher) {
         teacherDetails = {
           teacherId: teacher._id,
@@ -70,9 +70,9 @@ export class AuthService {
   }
 
   async registerTeacher(registerDto: RegisterTeacherDto) {
-    const userExists = await this.userModel.findOne({ email: registerDto.email }).exec();
+    const userExists = await this.userModel.findOne({ email: registerDto.email }).lean().exec();
     if (userExists) {
-      throw new ConflictException('Email already registered');
+      throw new ConflictException('El correo electrónico ya está registrado.');
     }
 
     const passwordHash = await bcrypt.hash(registerDto.password, 10);
@@ -128,7 +128,6 @@ export class AuthService {
   }
 
   async listTeachers() {
-    const teachers = await this.teacherModel.find().populate('user', 'email isActive').exec();
-    return teachers;
+    return this.teacherModel.find().populate('user', 'email isActive').lean().exec();
   }
 }

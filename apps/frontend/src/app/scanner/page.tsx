@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import { 
   ArrowLeft, Calendar, Award, CheckCircle, ShieldAlert, 
   Send, Flashlight, X, ClipboardList, RefreshCw, Database,
-  Sliders, Zap, User, Clock, Check, ClipboardCheck
+  Sliders, Zap, User, Clock, Check, ClipboardCheck, Image
 } from 'lucide-react';
 // We import html5-qrcode dynamically because it accesses window/navigator and is client-side only
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 
 export default function ScannerPage() {
   const router = useRouter();
@@ -50,9 +50,7 @@ export default function ScannerPage() {
     time: string;
   } | null>(null);
 
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const qrCodeRef = useRef<Html5Qrcode | null>(null);
 
   // Parse query string client-side safely
   useEffect(() => {
@@ -106,78 +104,110 @@ export default function ScannerPage() {
     }
   }, [selectedSubjectId, scanMode, token]);
 
+  // File Scanning handler
+  const handleFileScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setScanStatus('loading');
+    setStatusMessage('Procesando imagen...');
+
+    try {
+      let scanner = qrCodeRef.current;
+      let wasScanning = false;
+
+      if (scanner && scanner.isScanning) {
+        wasScanning = true;
+        await scanner.stop();
+      }
+
+      const tempScanner = new Html5Qrcode('reader');
+      const decodedText = await tempScanner.scanFile(file, true);
+      
+      setScanStatus('idle');
+      processScan(decodedText);
+
+      // Restart camera scanning if it was running
+      if (wasScanning) {
+        tempScanner.start(
+          { facingMode: 'environment' },
+          {
+            fps: 15,
+            qrbox: { width: 220, height: 220 }
+          },
+          handleScanSuccess,
+          () => {}
+        ).then(() => {
+          qrCodeRef.current = tempScanner;
+        });
+      }
+    } catch (err: any) {
+      setScanStatus('error');
+      setStatusMessage('No se pudo decodificar ningún código QR en la imagen.');
+      
+      // Attempt to restart camera if it was stopped
+      if (qrCodeRef.current && !qrCodeRef.current.isScanning) {
+        qrCodeRef.current.start(
+          { facingMode: 'environment' },
+          {
+            fps: 15,
+            qrbox: { width: 220, height: 220 }
+          },
+          handleScanSuccess,
+          () => {}
+        ).catch(console.error);
+      }
+      
+      setTimeout(() => {
+        setScanStatus('idle');
+        setStatusMessage('');
+      }, 3000);
+    }
+  };
+
   // Initialize html5-qrcode camera scanner
   useEffect(() => {
-    // Only initialize scanner if we have selected the required fields
     const readyToScan = 
       (scanMode === 'attendance') ||
       (scanMode === 'grades' && selectedAssignmentId);
 
     if (!readyToScan) {
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(() => {});
-        scannerRef.current = null;
+      if (qrCodeRef.current && qrCodeRef.current.isScanning) {
+        qrCodeRef.current.stop().catch(err => console.error(err));
       }
       return;
     }
 
-    // Delay instantiation to ensure DOM element '#reader' is fully rendered
     const timer = setTimeout(() => {
       try {
-        const scanner = new Html5QrcodeScanner(
-          'reader',
-          { 
-            fps: 15, 
-            qrbox: { width: 220, height: 220 },
-            aspectRatio: 1.0
-          },
-          /* verbose= */ false
-        );
+        const html5QrCode = new Html5Qrcode('reader');
+        qrCodeRef.current = html5QrCode;
 
-        scanner.render(handleScanSuccess, handleScanError);
-        scannerRef.current = scanner;
+        html5QrCode.start(
+          { facingMode: 'environment' },
+          {
+            fps: 15,
+            qrbox: { width: 220, height: 220 }
+          },
+          handleScanSuccess,
+          () => {}
+        ).catch(err => {
+          console.error('Error starting Html5Qrcode:', err);
+        });
       } catch (err) {
-        console.error('Error initializing scanner:', err);
+        console.error('Error initializing Html5Qrcode:', err);
       }
     }, 400);
 
     return () => {
       clearTimeout(timer);
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(err => console.error('Error clearing scanner:', err));
-        scannerRef.current = null;
+      if (qrCodeRef.current) {
+        if (qrCodeRef.current.isScanning) {
+          qrCodeRef.current.stop().catch(err => console.error(err));
+        }
       }
     };
   }, [scanMode, selectedSubjectId, selectedAssignmentId]);
-
-  // Start rear camera feed for fullscreen background
-  useEffect(() => {
-    let active = true;
-    const startCamera = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-          audio: false
-        });
-        if (!active) { stream.getTracks().forEach(t => t.stop()); return; }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(() => {});
-        }
-      } catch (err) {
-        console.warn('No se pudo acceder a la cámara trasera:', err);
-      }
-    };
-    startCamera();
-    return () => {
-      active = false;
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
-        streamRef.current = null;
-      }
-    };
-  }, []);
 
   const fetchSubjects = async (authToken: string, initialSubjectId?: string) => {
     try {
@@ -344,17 +374,13 @@ export default function ScannerPage() {
     }}>
 
       {/* ===== FULLSCREEN CAMERA BACKGROUND ===== */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
+      <div
+        id="reader"
         style={{
           position: 'fixed',
           inset: 0,
           width: '100%',
           height: '100%',
-          objectFit: 'cover',
           zIndex: 0
         }}
       />
@@ -423,24 +449,53 @@ export default function ScannerPage() {
           </span>
         </div>
 
-        <button 
-          onClick={() => setShowConfig(prev => !prev)}
-          style={{ 
-            background: showConfig ? '#0284c7' : 'rgba(255,255,255,0.1)', 
-            border: 'none', 
-            borderRadius: '50%', 
-            width: '40px', 
-            height: '40px', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            color: 'white',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-        >
-          <Sliders size={18} />
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {/* File Upload Icon Button */}
+          <label 
+            style={{ 
+              background: 'rgba(255,255,255,0.1)', 
+              border: 'none', 
+              borderRadius: '50%', 
+              width: '40px', 
+              height: '40px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              color: 'white',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+          >
+            <Image size={18} />
+            <input 
+              type="file" 
+              accept="image/*" 
+              onChange={handleFileScan} 
+              style={{ display: 'none' }} 
+            />
+          </label>
+
+          <button 
+            onClick={() => setShowConfig(prev => !prev)}
+            style={{ 
+              background: showConfig ? '#0284c7' : 'rgba(255,255,255,0.1)', 
+              border: 'none', 
+              borderRadius: '50%', 
+              width: '40px', 
+              height: '40px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              color: 'white',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            <Sliders size={18} />
+          </button>
+        </div>
       </header>
 
       {/* Expandable Configuration Drawer */}
@@ -581,7 +636,7 @@ export default function ScannerPage() {
           
           {/* html5-qrcode reader element goes behind */}
           {(scanMode === 'attendance' || (scanMode === 'grades' && selectedAssignmentId)) ? (
-            <div id="reader" style={{ width: '100%', height: '100%', borderRadius: '24px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}></div>
+            <div style={{ width: '100%', height: '100%', borderRadius: '24px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)', background: 'transparent' }}></div>
           ) : (
             <div style={{ 
               width: '100%', 
@@ -1150,45 +1205,14 @@ export default function ScannerPage() {
       `}</style>
       
       <style jsx global>{`
-        /* Hide the internal video/viewfinder of html5-qrcode — we show our own */
-        #reader video,
-        #reader__scan_region video {
-          display: none !important;
+        #reader video {
+          width: 100% !important;
+          height: 100% !important;
+          object-fit: cover !important;
         }
-        #reader,
-        #reader__scan_region,
-        #reader__dashboard {
+        #reader {
           background: transparent !important;
           border: none !important;
-        }
-        #html5-qrcode-button-camera-start,
-        #html5-qrcode-button-camera-stop,
-        #html5-qrcode-button-camera-permission {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 10px 20px;
-          border-radius: 10px;
-          background: #0284c7 !important;
-          color: white !important;
-          border: none;
-          font-family: var(--font-outfit);
-          font-weight: 700;
-          font-size: 0.85rem;
-          margin-top: 10px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        #html5-qrcode-button-camera-start:hover {
-          background: #0369a1 !important;
-        }
-        #html5-qrcode-anchor-scan-type-change {
-          color: #38bdf8;
-          text-decoration: none;
-          font-size: 0.8rem;
-          display: block;
-          margin-top: 12px;
-          font-weight: 600;
         }
       `}</style>
     </div>

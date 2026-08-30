@@ -27,7 +27,7 @@ export class AttendanceService {
     let attendance = await this.attendanceModel.findOne({
       student: student._id,
       date: todayStr,
-    }).populate('student').exec();
+    }).populate('student', 'name').exec();
 
     if (attendance) {
       attendance.status = 'PRESENT';
@@ -40,7 +40,7 @@ export class AttendanceService {
         status: 'PRESENT',
         scannedAt: new Date(),
       });
-      attendance = await attendance.populate('student');
+      await attendance.populate('student', 'name');
     }
 
     this.appGateway.sendAttendanceScan(teacherId, {
@@ -62,7 +62,7 @@ export class AttendanceService {
     const records = await this.attendanceModel.find({
       student: { $in: studentIds },
       date,
-    }).exec();
+    }).lean().exec();
 
     return students.map(student => {
       const record = records.find(r => r.student.toString() === student._id.toString());
@@ -103,27 +103,30 @@ export class AttendanceService {
 
   async markAllPresent(teacherId: string, subjectId: string, date: string) {
     const students = await this.studentsService.findAll(teacherId);
-
-    const records = [];
-    for (const student of students) {
-      let attendance = await this.attendanceModel.findOne({
-        student: student._id,
-        date,
-      }).exec();
-
-      if (attendance) {
-        attendance.status = 'PRESENT';
-        await attendance.save();
-      } else {
-        attendance = await this.attendanceModel.create({
-          student: student._id,
-          date,
-          status: 'PRESENT',
-          scannedAt: new Date(),
-        });
-      }
-      records.push(attendance);
+    if (!students || students.length === 0) {
+      return [];
     }
-    return records;
+
+    const operations = students.map(student => ({
+      updateOne: {
+        filter: { student: student._id, date },
+        update: {
+          $set: {
+            status: 'PRESENT',
+            scannedAt: new Date(),
+          }
+        },
+        upsert: true
+      }
+    }));
+
+    await this.attendanceModel.bulkWrite(operations);
+
+    const studentIds = students.map(s => s._id);
+    return this.attendanceModel.find({
+      student: { $in: studentIds },
+      date,
+    }).lean().exec();
   }
 }
+

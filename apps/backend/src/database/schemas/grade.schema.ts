@@ -24,3 +24,5 @@ export class Grade extends Document {
 }
 
 export const GradeSchema = SchemaFactory.createForClass(Grade);
+GradeSchema.index({ student: 1, assignment: 1 }, { unique: true });
+

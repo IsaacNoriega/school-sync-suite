@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Student, StudentDocument } from '../../database/schemas/student.schema';
@@ -18,6 +18,13 @@ export class StudentsService {
   ) {}
 
   async create(teacherId: string, name: string, enrollmentNumber?: string) {
+    if (enrollmentNumber) {
+      const existing = await this.studentModel.findOne({ enrollmentNumber }).lean().exec();
+      if (existing) {
+        throw new ConflictException('La matrícula ya está registrada para otro alumno.');
+      }
+    }
+
     const suffix = Math.random().toString(36).substring(2, 7).toUpperCase();
     const qrCode = `STUDENT-${teacherId.substring(18, 24).toUpperCase()}-${Date.now().toString(36).toUpperCase()}-${suffix}`;
 
@@ -30,11 +37,11 @@ export class StudentsService {
   }
 
   async findAll(teacherId: string) {
-    return this.studentModel.find({ teacher: teacherId }).exec();
+    return this.studentModel.find({ teacher: teacherId }).lean().exec();
   }
 
   async findOne(teacherId: string, id: string) {
-    const student = await this.studentModel.findById(id).exec();
+    const student = await this.studentModel.findById(id).lean().exec();
     if (!student) {
       throw new NotFoundException('Student not found');
     }
@@ -45,7 +52,7 @@ export class StudentsService {
   }
 
   async findByQrCode(qrCode: string) {
-    const student = await this.studentModel.findOne({ qrCode }).exec();
+    const student = await this.studentModel.findOne({ qrCode }).lean().exec();
     if (!student) {
       throw new NotFoundException(`Student with QR code ${qrCode} not found`);
     }
@@ -54,6 +61,16 @@ export class StudentsService {
 
   async update(teacherId: string, id: string, name?: string, enrollmentNumber?: string) {
     await this.findOne(teacherId, id);
+    if (enrollmentNumber) {
+      const existing = await this.studentModel.findOne({
+        enrollmentNumber,
+        _id: { $ne: id }
+      }).lean().exec();
+      if (existing) {
+        throw new ConflictException('La matrícula ya está registrada para otro alumno.');
+      }
+    }
+
     return this.studentModel.findByIdAndUpdate(
       id,
       { name, enrollmentNumber },
@@ -71,24 +88,32 @@ export class StudentsService {
     const student = await this.findOne(teacherId, studentId);
 
     // 2. Fetch all subjects for this teacher
-    const subjects = await this.subjectModel.find({ teacher: teacherId }).exec();
+    const subjects = await this.subjectModel.find({ teacher: teacherId }).select('_id name').lean().exec();
     const subjectIds = subjects.map(s => s._id);
 
     // 3. Fetch all assignments for these subjects
-    const assignments = await this.assignmentModel.find({ subject: { $in: subjectIds } }).exec();
+    const assignments = await this.assignmentModel.find({ subject: { $in: subjectIds } }).select('_id').lean().exec();
     const assignmentIds = assignments.map(a => a._id);
 
     // 4. Fetch grades for this student for these assignments
     const grades = await this.gradeModel.find({
       student: studentId,
       assignment: { $in: assignmentIds },
-    }).populate('assignment').exec();
+    })
+    .select('_id score gradedAt manualCorrection assignment')
+    .populate('assignment', '_id title maxScore dueDate subject')
+    .lean()
+    .exec();
 
     // 5. Fetch attendance records for this student for these subjects
     const attendances = await this.attendanceModel.find({
       student: studentId,
       subject: { $in: subjectIds },
-    }).populate('subject').exec();
+    })
+    .select('_id date status scannedAt subject')
+    .populate('subject', '_id name')
+    .lean()
+    .exec();
 
     // 6. Compute summary metrics
     const totalAssignments = assignments.length;
@@ -158,3 +183,4 @@ export class StudentsService {
     };
   }
 }
+

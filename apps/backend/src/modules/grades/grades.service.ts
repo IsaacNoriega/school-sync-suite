@@ -30,7 +30,7 @@ export class GradesService {
     let grade = await this.gradeModel.findOne({
       student: student._id,
       assignment: assignmentId,
-    }).populate('student').exec();
+    }).populate('student', 'name').exec();
 
     if (grade) {
       grade.score = score;
@@ -45,7 +45,7 @@ export class GradesService {
         gradedAt: new Date(),
         manualCorrection: false,
       });
-      grade = await grade.populate('student');
+      await grade.populate('student', 'name');
     }
 
     this.appGateway.sendGradeScan(teacherId, {
@@ -65,7 +65,7 @@ export class GradesService {
 
     const students = await this.studentsService.findAll(teacherId);
 
-    const grades = await this.gradeModel.find({ assignment: assignmentId }).exec();
+    const grades = await this.gradeModel.find({ assignment: assignmentId }).lean().exec();
 
     return students.map(student => {
       const grade = grades.find(g => g.student.toString() === student._id.toString());

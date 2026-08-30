@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Assignment, AssignmentDocument } from '../../database/schemas/assignment.schema';
@@ -14,6 +14,11 @@ export class AssignmentsService {
   async create(teacherId: string, subjectId: string, title: string, description?: string, maxScore = 10, dueDate?: Date) {
     await this.subjectsService.findOne(teacherId, subjectId);
 
+    const existingAssignment = await this.assignmentModel.findOne({ subject: subjectId, title }).lean().exec();
+    if (existingAssignment) {
+      throw new ConflictException('Ya existe una tarea con este título en esta asignatura.');
+    }
+
     return this.assignmentModel.create({
       subject: subjectId,
       title,
@@ -26,11 +31,11 @@ export class AssignmentsService {
   async findAllBySubject(teacherId: string, subjectId: string) {
     await this.subjectsService.findOne(teacherId, subjectId);
 
-    return this.assignmentModel.find({ subject: subjectId }).exec();
+    return this.assignmentModel.find({ subject: subjectId }).lean().exec();
   }
 
   async findOne(teacherId: string, id: string) {
-    const assignment = await this.assignmentModel.findById(id).populate('subject').exec();
+    const assignment = await this.assignmentModel.findById(id).populate('subject').lean().exec();
     if (!assignment) {
       throw new NotFoundException('Assignment not found');
     }
@@ -42,7 +47,18 @@ export class AssignmentsService {
   }
 
   async update(teacherId: string, id: string, title?: string, description?: string, maxScore?: number, dueDate?: Date) {
-    await this.findOne(teacherId, id);
+    const assignment = await this.findOne(teacherId, id);
+    if (title) {
+      const existingAssignment = await this.assignmentModel.findOne({
+        subject: assignment.subject._id,
+        title,
+        _id: { $ne: id }
+      }).lean().exec();
+      if (existingAssignment) {
+        throw new ConflictException('Ya existe una tarea con este título en esta asignatura.');
+      }
+    }
+
     return this.assignmentModel.findByIdAndUpdate(
       id,
       { title, description, maxScore, dueDate },
