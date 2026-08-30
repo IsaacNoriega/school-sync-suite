@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Outfit } from 'next/font/google';
+import SecurityProvider from '@/components/SecurityProvider';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -23,7 +24,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className={outfit.variable}>
-      <body>{children}</body>
+      <body>
+        <SecurityProvider>
+          {children}
+        </SecurityProvider>
+      </body>
     </html>
   );
 }
