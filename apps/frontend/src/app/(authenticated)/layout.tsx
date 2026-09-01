@@ -70,18 +70,27 @@ export default function AuthenticatedLayout({
     // Initialize WebSockets and load initial cache for teachers
     if (parsedUser.role === 'TEACHER') {
 
-
       let socketConnection: Socket | null = null;
 
       const connectSocket = () => {
         if (!socketConnection) {
-          const conn = io(API_BASE_URL);
+          const conn = io(API_BASE_URL, {
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 10000,
+            transports: ['websocket', 'polling']
+          });
           socketConnection = conn;
           setSocket(conn);
 
           conn.on('connect', () => {
-            conn.emit('join_room', { teacherId: parsedUser.teacherId });
+            conn.emit('join_room', { teacherId: parsedUser.teacherId, token: savedToken });
             addLog('Conectado al servidor de sincronización en tiempo real.');
+          });
+          
+          conn.on('connect_error', (err) => {
+            addLog(`⚠️ Error de conexión: ${err.message}. Reintentando...`);
           });
         }
       };
@@ -125,7 +134,7 @@ export default function AuthenticatedLayout({
         window.removeEventListener('pagehide', handlePageHide);
       };
     }
-  }, [router, pathname]);
+  }, [router]);
 
 
 
