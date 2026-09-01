@@ -15,38 +15,34 @@ export class AttendanceController {
   @Post('scan')
   scan(
     @CurrentUser() user: any,
-    @Body('subjectId') subjectId: string,
     @Body('qrCode') qrCode: string,
   ) {
-    return this.attendanceService.scanAttendance(user.teacherId, subjectId, qrCode);
+    return this.attendanceService.scanAttendance(user.teacherId, qrCode);
   }
 
   @Get('daily')
   getDaily(
     @CurrentUser() user: any,
-    @Query('subjectId') subjectId: string,
     @Query('date') date: string, // YYYY-MM-DD
   ) {
-    return this.attendanceService.getDailyAttendance(user.teacherId, subjectId, date);
+    return this.attendanceService.getDailyAttendance(user.teacherId, date);
   }
 
   @Post('manual')
   manualCorrect(
     @CurrentUser() user: any,
     @Body('studentId') studentId: string,
-    @Body('subjectId') subjectId: string,
     @Body('date') date: string,
     @Body('status') status: AttendanceStatus,
   ) {
-    return this.attendanceService.manualCorrection(user.teacherId, studentId, subjectId, date, status);
+    return this.attendanceService.manualCorrection(user.teacherId, studentId, date, status);
   }
 
   @Post('mark-all-present')
   markAllPresent(
     @CurrentUser() user: any,
-    @Body('subjectId') subjectId: string,
     @Body('date') date: string,
   ) {
-    return this.attendanceService.markAllPresent(user.teacherId, subjectId, date);
+    return this.attendanceService.markAllPresent(user.teacherId, date);
   }
 }

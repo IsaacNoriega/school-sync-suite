@@ -302,7 +302,6 @@ export default function ScannerPage() {
 
       if (scanMode === 'attendance') {
         endpoint = `${API_BASE_URL}/attendance/scan`;
-        body.subjectId = selectedSubjectId;
       } else {
         endpoint = `${API_BASE_URL}/grades/scan`;
         body.assignmentId = selectedAssignmentId;
@@ -310,14 +309,47 @@ export default function ScannerPage() {
       }
 
       const activeToken = localStorage.getItem('token') || token;
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${activeToken}`
-        },
-        body: JSON.stringify(body)
-      });
+      
+      let response: Response;
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${activeToken}`
+          },
+          body: JSON.stringify(body)
+        });
+      } catch (networkErr: any) {
+        // Network error -> enqueue
+        setScanStatus('error');
+        setStatusMessage('Sin conexión. Registrado en cola offline.');
+        toast.error('Sin conexión. Registrado en cola offline.');
+        
+        const foundStudent = students.find(s => s.qrCode === qrCodeString);
+        const studentName = foundStudent ? foundStudent.name : (qrCodeString.startsWith('STUDENT-') ? `Alumno ${qrCodeString.split('-')[3] || qrCodeString.split('-')[1] || 'Temp'}` : 'Código Escaneado');
+        const newOfflineItem = {
+          mode: scanMode,
+          qrCode: qrCodeString,
+          name: studentName,
+          date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          subjectId: scanMode === 'attendance' ? undefined : selectedSubjectId,
+          assignmentId: selectedAssignmentId,
+          score: gradingScore
+        };
+        
+        setOfflineQueue(prev => [newOfflineItem, ...prev]);
+
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate([100, 50, 100]);
+        }
+
+        setTimeout(() => {
+          setScanStatus('idle');
+          setStatusMessage('');
+        }, 4000);
+        return;
+      }
 
       const data = await response.json();
 
@@ -350,25 +382,11 @@ export default function ScannerPage() {
       }, 2500);
 
     } catch (err: any) {
+      // Business error -> show toast, do not enqueue
       setScanStatus('error');
       const errMsg = err.message || 'Código QR no reconocido';
       setStatusMessage(errMsg);
       toast.error(errMsg);
-      
-      // If server scan fails, we can add it to the offline queue as fallback
-      const foundStudent = students.find(s => s.qrCode === qrCodeString);
-      const studentName = foundStudent ? foundStudent.name : (qrCodeString.startsWith('STUDENT-') ? `Alumno ${qrCodeString.split('-')[3] || qrCodeString.split('-')[1] || 'Temp'}` : 'Código Escaneado');
-      const newOfflineItem = {
-        mode: scanMode,
-        qrCode: qrCodeString,
-        name: studentName,
-        date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        subjectId: selectedSubjectId,
-        assignmentId: selectedAssignmentId,
-        score: gradingScore
-      };
-      
-      setOfflineQueue(prev => [newOfflineItem, ...prev]);
 
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate([100, 50, 100]);

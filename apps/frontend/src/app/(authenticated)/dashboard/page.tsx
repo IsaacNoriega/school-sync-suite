@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   BookOpen, Users, FileText, CheckSquare, Plus, Calendar, RefreshCw, Award, Radio, QrCode, 
@@ -90,17 +90,27 @@ export default function DashboardPage() {
     }
   }, [token]);
 
-  // Load lists dynamically when selectedSubject or activeTab or selectedDate changes
+  // Fetch assignments when selected subject changes
+  const prevSubjectRef = useRef<string | null>(null);
   useEffect(() => {
-    if (token) {
-      if (selectedSubject) {
+    if (token && selectedSubject) {
+      if (prevSubjectRef.current !== selectedSubject._id) {
         fetchAssignments(token, selectedSubject._id);
-      }
-      if (activeTab === 'attendance') {
-        fetchAttendance(token, selectedSubject?._id || 'global', selectedDate);
+        prevSubjectRef.current = selectedSubject._id;
       }
     }
-  }, [selectedSubject, activeTab, selectedDate, token]);
+  }, [selectedSubject, token]);
+
+  // Fetch attendance when date changes or visiting tab
+  const prevDateRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (token && activeTab === 'attendance') {
+      if (prevDateRef.current !== selectedDate || attendanceList.length === 0) {
+        fetchAttendance(token, selectedDate);
+        prevDateRef.current = selectedDate;
+      }
+    }
+  }, [activeTab, selectedDate, token]);
 
   // Fetch grades when assignment changes
   useEffect(() => {
@@ -271,11 +281,11 @@ export default function DashboardPage() {
     }
   };
 
-  const fetchAttendance = async (authToken: string, subjectId: string, date: string) => {
+  const fetchAttendance = async (authToken: string, date: string) => {
     setLoadingAttendance(true);
     setErrorAttendance('');
     try {
-      const response = await fetch(`${API_BASE_URL}/attendance/daily?subjectId=${subjectId}&date=${date}`, {
+      const response = await fetch(`${API_BASE_URL}/attendance/daily?date=${date}`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await response.json();
@@ -383,8 +393,14 @@ export default function DashboardPage() {
     }
   };
 
-  const handleUpdateAttendanceManual = async (studentId: string, status: 'PRESENT' | 'ABSENT' | 'LATE') => {
-    const subId = selectedSubject?._id || 'global';
+  const handleUpdateAttendanceManual = async (studentId: string, status: string) => {
+    if (!token) return;
+    
+    // Update local state first for immediate UI response
+    setAttendanceList(prev => prev.map(a => 
+      a.studentId === studentId ? { ...a, status, scannedAt: new Date().toISOString() } : a
+    ));
+
     try {
       const response = await fetch(`${API_BASE_URL}/attendance/manual`, {
         method: 'POST',
@@ -394,7 +410,6 @@ export default function DashboardPage() {
         },
         body: JSON.stringify({
           studentId,
-          subjectId: subId,
           date: selectedDate,
           status
         })
@@ -455,7 +470,7 @@ export default function DashboardPage() {
   };
 
   const handleMarkAllPresent = async () => {
-    const subId = selectedSubject?._id || 'global';
+    if (!token) return;
     try {
       const response = await fetch(`${API_BASE_URL}/attendance/mark-all-present`, {
         method: 'POST',
@@ -464,7 +479,6 @@ export default function DashboardPage() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          subjectId: subId,
           date: selectedDate
         })
       });
@@ -787,7 +801,7 @@ export default function DashboardPage() {
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>
                   Alumnos Inscritos ({filteredAttendance.length})
                 </h3>
-                {selectedSubject && filteredAttendance.length > 0 && (
+                {filteredAttendance.length > 0 && (
                   <button 
                     onClick={handleMarkAllPresent}
                     className="btn btn-secondary" 

@@ -16,7 +16,7 @@ export class AttendanceService {
     private appGateway: AppGateway,
   ) {}
 
-  async scanAttendance(teacherId: string, subjectId: string, qrCode: string) {
+  async scanAttendance(teacherId: string, qrCode: string) {
     const student = await this.studentsService.findByQrCode(qrCode);
     if (student.teacher.toString() !== teacherId) {
       throw new ForbiddenException('This student does not belong to you');
@@ -55,7 +55,7 @@ export class AttendanceService {
     return attendance;
   }
 
-  async getDailyAttendance(teacherId: string, subjectId: string, date: string) {
+  async getDailyAttendance(teacherId: string, date: string) {
     const students = await this.studentsService.findAll(teacherId);
     const studentIds = students.map(s => s._id);
 
@@ -78,7 +78,7 @@ export class AttendanceService {
     });
   }
 
-  async manualCorrection(teacherId: string, studentId: string, subjectId: string, date: string, status: AttendanceStatus) {
+  async manualCorrection(teacherId: string, studentId: string, date: string, status: AttendanceStatus) {
     await this.studentsService.findOne(teacherId, studentId);
 
     let attendance = await this.attendanceModel.findOne({
@@ -101,7 +101,7 @@ export class AttendanceService {
     return attendance;
   }
 
-  async markAllPresent(teacherId: string, subjectId: string, date: string) {
+  async markAllPresent(teacherId: string, date: string) {
     const students = await this.studentsService.findAll(teacherId);
     if (!students || students.length === 0) {
       return [];

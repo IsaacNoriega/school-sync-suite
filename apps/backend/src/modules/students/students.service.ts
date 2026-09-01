@@ -105,13 +105,11 @@ export class StudentsService {
     .lean()
     .exec();
 
-    // 5. Fetch attendance records for this student for these subjects
+    // 5. Fetch attendance records for this student
     const attendances = await this.attendanceModel.find({
       student: studentId,
-      subject: { $in: subjectIds },
     })
-    .select('_id date status scannedAt subject')
-    .populate('subject', '_id name')
+    .select('_id date status scannedAt')
     .lean()
     .exec();
 
@@ -160,13 +158,11 @@ export class StudentsService {
         };
       }),
       attendance: attendances.map(a => {
-        const subjectObj = a.subject as any;
         return {
           _id: a._id,
           date: a.date,
           status: a.status,
           scannedAt: a.scannedAt,
-          subjectName: subjectObj ? subjectObj.name : 'Asignatura Desconocida',
         };
       }),
       summary: {

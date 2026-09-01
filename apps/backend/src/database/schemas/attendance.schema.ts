@@ -11,8 +11,6 @@ export class Attendance extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Student', required: true, index: true })
   student: Types.ObjectId | Student;
 
-  @Prop({ type: Types.ObjectId, ref: 'Subject', required: false, index: true })
-  subject?: Types.ObjectId | Subject;
 
   @Prop({ required: true, index: true })
   date: string; // Formatted YYYY-MM-DD
