@@ -35,6 +35,18 @@ export default function ScannerPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [offlineQueue, setOfflineQueue] = useState<any[]>([]);
 
+  // Refs for current states to avoid stale closures in camera callback without re-triggering useEffect
+  const scanModeRef = useRef(scanMode);
+  const selectedAssignmentIdRef = useRef(selectedAssignmentId);
+
+  useEffect(() => {
+    scanModeRef.current = scanMode;
+  }, [scanMode]);
+
+  useEffect(() => {
+    selectedAssignmentIdRef.current = selectedAssignmentId;
+  }, [selectedAssignmentId]);
+
   // Scan simulation fallback
   const [manualQrCode, setManualQrCode] = useState('');
   const [showManualInput, setShowManualInput] = useState(false);
@@ -192,48 +204,43 @@ export default function ScannerPage() {
     }
   };
 
-  // Initialize html5-qrcode camera scanner
+  // Initialize html5-qrcode camera scanner ONCE
   useEffect(() => {
-    const readyToScan = 
-      (scanMode === 'attendance') ||
-      (scanMode === 'grades' && selectedAssignmentId);
+    let isComponentMounted = true;
+    let html5QrCode: Html5Qrcode | null = null;
+    let isTransitioning = false;
 
-    if (!readyToScan) {
-      if (qrCodeRef.current && qrCodeRef.current.isScanning) {
-        qrCodeRef.current.stop().catch(err => console.error(err));
-      }
-      return;
-    }
-
-    const timer = setTimeout(() => {
+    const startCamera = async () => {
       try {
-        const html5QrCode = new Html5Qrcode('reader');
+        html5QrCode = new Html5Qrcode('reader');
         qrCodeRef.current = html5QrCode;
-
-        html5QrCode.start(
+        isTransitioning = true;
+        await html5QrCode.start(
           { facingMode: 'environment' },
-          {
-            fps: 15
-          },
+          { fps: 15 },
           handleScanSuccess,
           () => {}
-        ).catch(err => {
-          console.error('Error starting Html5Qrcode:', err);
-        });
+        );
+        isTransitioning = false;
       } catch (err) {
-        console.error('Error initializing Html5Qrcode:', err);
+        console.error('Error starting Html5Qrcode:', err);
+        isTransitioning = false;
       }
+    };
+
+    const timer = setTimeout(() => {
+      startCamera();
     }, 400);
 
     return () => {
+      isComponentMounted = false;
       clearTimeout(timer);
-      if (qrCodeRef.current) {
-        if (qrCodeRef.current.isScanning) {
-          qrCodeRef.current.stop().catch(err => console.error(err));
-        }
+      if (html5QrCode && html5QrCode.isScanning && !isTransitioning) {
+        html5QrCode.stop().catch(err => console.error(err));
       }
     };
-  }, [scanMode, selectedSubjectId, selectedAssignmentId]);
+    // We remove scanMode, selectedSubjectId, selectedAssignmentId to avoid restarting camera on UI changes
+  }, []);
 
   const fetchSubjects = async (authToken: string, initialSubjectId?: string) => {
     try {
@@ -402,16 +409,29 @@ export default function ScannerPage() {
   const SCAN_COOLDOWN_MS = 3000; // ms to ignore the same QR code again
 
   const handleScanSuccess = (decodedText: string) => {
+    const currentMode = scanModeRef.current;
+    const currentAssignment = selectedAssignmentIdRef.current;
+    
+    // Ignore scans if not ready
+    if (currentMode === 'grades' && !currentAssignment) {
+      return;
+    }
+
     const now = Date.now();
     const last = lastScannedRef.current;
     // Block if same code scanned within cooldown window
     if (decodedText === last.code && now - last.time < SCAN_COOLDOWN_MS) {
       return;
     }
-    if (scanStatus === 'idle') {
-      lastScannedRef.current = { code: decodedText, time: now };
-      processScan(decodedText);
-    }
+    // We check state setter via callback to avoid stale scanStatus closure
+    setScanStatus(prevStatus => {
+      if (prevStatus === 'idle') {
+        lastScannedRef.current = { code: decodedText, time: now };
+        // We use setTimeout to escape the state updater function
+        setTimeout(() => processScan(decodedText), 0);
+      }
+      return prevStatus;
+    });
   };
 
   const handleScanError = (errorMessage: string) => {
