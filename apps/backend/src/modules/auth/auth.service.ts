@@ -18,14 +18,20 @@ export class AuthService {
   async seedAdmin() {
     const adminExists = await this.userModel.findOne({ role: 'SUPER_ADMIN' }).exec();
     if (!adminExists) {
-      const passwordHash = await bcrypt.hash('IsaacAdmin1610', 10);
+      const adminEmail = process.env.ADMIN_EMAIL;
+      const adminPassword = process.env.ADMIN_PASSWORD;
+      if (!adminEmail || !adminPassword) {
+        console.warn('ADMIN_EMAIL or ADMIN_PASSWORD env vars not set. Skipping SUPER_ADMIN seed.');
+        return;
+      }
+      const passwordHash = await bcrypt.hash(adminPassword, 12);
       await this.userModel.create({
-        email: 'isaac_norvi@hotmail.com',
+        email: adminEmail,
         passwordHash,
         role: 'SUPER_ADMIN',
         isActive: true,
       });
-      console.log('--- ADMIN SEED CREATED --- isaac_norvi@hotmail.com / IsaacAdmin1610');
+      console.log(`--- ADMIN SEED CREATED --- ${adminEmail}`);
     }
   }
 
@@ -51,10 +57,11 @@ export class AuthService {
       const teacher = await this.teacherModel.findOne({ user: user._id }).lean().exec();
       if (teacher) {
         teacherDetails = {
-          teacherId: teacher._id,
+          teacherId: teacher._id.toString(),
           name: teacher.name,
           schoolName: teacher.schoolName,
         };
+        payload['teacherId'] = teacher._id.toString();
       }
     }
 
@@ -121,7 +128,7 @@ export class AuthService {
       throw new UnauthorizedException('Contraseña actual incorrecta');
     }
 
-    user.passwordHash = await bcrypt.hash(changePasswordDto.newPassword, 10);
+    user.passwordHash = await bcrypt.hash(changePasswordDto.newPassword, 12);
     await user.save();
 
     return { message: 'Contraseña actualizada correctamente' };

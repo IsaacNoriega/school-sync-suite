@@ -42,25 +42,20 @@ export class AssignmentsController {
     const safeSubjectName = subjectName.replace(/[^a-zA-Z0-9_áéíóúÁÉÍÓÚñÑ\- ]/g, '_');
     const safeAssignmentTitle = assignmentTitle.replace(/[^a-zA-Z0-9_áéíóúÁÉÍÓÚñÑ\- ]/g, '_');
     
-    let currentDir = __dirname;
-    let workspaceRoot = '';
-    for (let i = 0; i < 6; i++) {
-      if (fs.existsSync(path.join(currentDir, 'pnpm-workspace.yaml'))) {
-        workspaceRoot = currentDir;
-        break;
-      }
-      currentDir = path.dirname(currentDir);
-    }
-    if (!workspaceRoot) {
-      workspaceRoot = path.join(process.cwd());
-    }
+    const os = require('os');
+    const exportsDir = path.resolve(os.tmpdir(), 'educaqr_exports', safeSubjectName);
     
-    const exportsDir = path.join(workspaceRoot, 'exports', safeSubjectName);
     if (!fs.existsSync(exportsDir)) {
       fs.mkdirSync(exportsDir, { recursive: true });
     }
     
-    const filePath = path.join(exportsDir, `${safeAssignmentTitle}.csv`);
+    const filePath = path.resolve(exportsDir, `${safeAssignmentTitle}.csv`);
+    
+    // Path traversal mitigation
+    if (!filePath.startsWith(exportsDir)) {
+      throw new Error('Invalid file path');
+    }
+    
     fs.writeFileSync(filePath, csvContent, 'utf8');
     
     return { success: true, path: filePath };

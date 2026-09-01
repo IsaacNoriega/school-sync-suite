@@ -29,26 +29,20 @@ export class StudentsController {
     @Body('csvContent') csvContent: string,
   ) {
     const safeStudentName = studentName.replace(/[^a-zA-Z0-9_áéíóúÁÉÍÓÚñÑ\- ]/g, '_');
+    const os = require('os');
+    const exportsDir = path.resolve(os.tmpdir(), 'educaqr_exports', 'Alumnos');
     
-    let currentDir = __dirname;
-    let workspaceRoot = '';
-    for (let i = 0; i < 6; i++) {
-      if (fs.existsSync(path.join(currentDir, 'pnpm-workspace.yaml'))) {
-        workspaceRoot = currentDir;
-        break;
-      }
-      currentDir = path.dirname(currentDir);
-    }
-    if (!workspaceRoot) {
-      workspaceRoot = path.join(process.cwd());
-    }
-    
-    const exportsDir = path.join(workspaceRoot, 'exports', 'Alumnos');
     if (!fs.existsSync(exportsDir)) {
       fs.mkdirSync(exportsDir, { recursive: true });
     }
     
-    const filePath = path.join(exportsDir, `Reporte_${safeStudentName}.csv`);
+    const filePath = path.resolve(exportsDir, `Reporte_${safeStudentName}.csv`);
+    
+    // Path traversal mitigation
+    if (!filePath.startsWith(exportsDir)) {
+      throw new Error('Invalid file path');
+    }
+    
     fs.writeFileSync(filePath, csvContent, 'utf8');
     
     return { success: true, path: filePath };
