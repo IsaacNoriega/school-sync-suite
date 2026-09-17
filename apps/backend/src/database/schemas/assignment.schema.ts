@@ -20,6 +20,16 @@ export class Assignment extends Document {
 
   @Prop()
   dueDate: Date;
+
+  @Prop()
+  code: string;
+
+  @Prop()
+  color: string;
+
+  @Prop()
+  iconKey: string;
 }
 
 export const AssignmentSchema = SchemaFactory.createForClass(Assignment);
+AssignmentSchema.index({ subject: 1 });

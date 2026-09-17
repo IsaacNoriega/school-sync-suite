@@ -14,6 +14,15 @@ export class Teacher extends Document {
 
   @Prop({ required: true })
   schoolName: string;
+
+  @Prop({ default: '2025-2026' })
+  schoolCycle: string;
+
+  @Prop({ default: '07:30' })
+  entryTime: string;
+
+  @Prop({ default: 'Matutino' })
+  shift: string;
 }
 
 export const TeacherSchema = SchemaFactory.createForClass(Teacher);

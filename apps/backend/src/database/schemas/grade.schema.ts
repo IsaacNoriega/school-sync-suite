@@ -24,5 +24,12 @@ export class Grade extends Document {
 }
 
 export const GradeSchema = SchemaFactory.createForClass(Grade);
+
+// Unicidad: un alumno solo puede tener una calificación por tarea
 GradeSchema.index({ student: 1, assignment: 1 }, { unique: true });
 
+// Índice de cobertura para getDashboardMetrics:
+// Cubre la consulta { student: { $in }, assignment: { $in } }
+// con proyección .select('student assignment score')
+// MongoDB resuelve todo el query desde el índice sin cargar documentos (covered query)
+GradeSchema.index({ assignment: 1, student: 1, score: 1 });
