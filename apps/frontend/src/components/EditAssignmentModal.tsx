@@ -1,31 +1,36 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
-  ClipboardList,
   Check,
   CheckCircle2,
-  DraftingCompass,
-  ChevronsUpDown,
-  Palette,
-  BookOpen,
-  FlaskConical,
-  Trophy,
+  Pencil,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
+import { COLOR_OPTIONS, ICON_OPTIONS } from './CreateAssignmentModal';
 
-export interface CreateAssignmentModalProps {
+export interface EditAssignmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  subjects?: Array<{ _id: string; name: string; code?: string; color?: string; iconKey?: string }>;
-  defaultSubjectId?: string;
-  onSubmit?: (assignment: {
-    subjectId: string;
+  assignment: {
+    _id: string;
+    title: string;
+    description?: string;
+    maxScore: number;
+    dueDate?: string;
+    color?: string;
+    iconKey?: string;
+    subject?: {
+      _id: string;
+      name: string;
+    };
+  } | null;
+  onSubmit?: (id: string, updatedData: {
     title: string;
     maxScore: number;
     dueDate: string;
@@ -34,31 +39,12 @@ export interface CreateAssignmentModalProps {
   }) => Promise<void> | void;
 }
 
-export const COLOR_OPTIONS = [
-  { id: 'sky', bgClass: 'bg-[#bae6fd]', hex: '#38bdf8', label: 'Cielo' },
-  { id: 'emerald', bgClass: 'bg-[#bbf7d0]', hex: '#4ade80', label: 'Menta' },
-  { id: 'amber', bgClass: 'bg-[#fef08a]', hex: '#facc15', label: 'Ámbar' },
-  { id: 'rose', bgClass: 'bg-[#fecdd3]', hex: '#fb7185', label: 'Rosa' },
-  { id: 'purple', bgClass: 'bg-[#e9d5ff]', hex: '#c084fc', label: 'Lavanda' },
-];
-
-export const ICON_OPTIONS = [
-  { id: 'clipboard', label: 'Tarea', icon: ClipboardList },
-  { id: 'math', label: 'Matemática', icon: DraftingCompass },
-  { id: 'book', label: 'Lectura', icon: BookOpen },
-  { id: 'science', label: 'Ciencia', icon: FlaskConical },
-  { id: 'art', label: 'Arte', icon: Palette },
-  { id: 'sport', label: 'Deporte', icon: Trophy },
-];
-
-export default function CreateAssignmentModal({
+export default function EditAssignmentModal({
   isOpen,
   onClose,
-  subjects = [],
-  defaultSubjectId,
+  assignment,
   onSubmit,
-}: CreateAssignmentModalProps) {
-  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+}: EditAssignmentModalProps) {
   const [title, setTitle] = useState('');
   const [maxScore, setMaxScore] = useState<number>(100);
   const [dueDate, setDueDate] = useState('');
@@ -66,63 +52,40 @@ export default function CreateAssignmentModal({
   const [selectedIcon, setSelectedIcon] = useState('clipboard');
   const [loading, setLoading] = useState(false);
 
-  React.useEffect(() => {
-    if (isOpen) {
-      const initialSubjectId = defaultSubjectId || (subjects.length > 0 ? subjects[0]._id : '');
-      setSelectedSubjectId(initialSubjectId);
-      setTitle('');
-      setMaxScore(100);
-      
-      const foundSub = subjects.find(s => s._id === initialSubjectId);
-      if (foundSub?.color) {
-        setSelectedColor(foundSub.color);
+  useEffect(() => {
+    if (isOpen && assignment) {
+      setTitle(assignment.title || '');
+      setMaxScore(assignment.maxScore || 100);
+      if (assignment.dueDate) {
+        const d = new Date(assignment.dueDate);
+        if (!isNaN(d.getTime())) {
+          setDueDate(d.toISOString().split('T')[0]);
+        } else {
+          setDueDate(assignment.dueDate);
+        }
       } else {
-        setSelectedColor('sky');
+        setDueDate('');
       }
-
-      if (foundSub?.iconKey) {
-        setSelectedIcon(foundSub.iconKey);
-      } else {
-        setSelectedIcon('clipboard');
-      }
-
-      // Default due date: in 7 days formatted as YYYY-MM-DD
-      const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      setDueDate(nextWeek.toISOString().split('T')[0]);
+      setSelectedColor(assignment.color || 'sky');
+      setSelectedIcon(assignment.iconKey || 'clipboard');
     }
-  }, [isOpen, defaultSubjectId, subjects]);
+  }, [isOpen, assignment]);
 
-  const handleSubjectChange = (newSubjectId: string) => {
-    setSelectedSubjectId(newSubjectId);
-    const foundSub = subjects.find(s => s._id === newSubjectId);
-    if (foundSub?.color) {
-      setSelectedColor(foundSub.color);
-    }
-    if (foundSub?.iconKey) {
-      setSelectedIcon(foundSub.iconKey);
-    }
-  };
-
-  if (!isOpen) return null;
+  if (!isOpen || !assignment) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSubjectId) {
-      toast.error('Por favor selecciona una asignatura');
-      return;
-    }
     if (!title.trim()) {
       toast.error('Por favor escribe el título de la tarea');
       return;
     }
 
     setLoading(true);
-    const toastId = toast.loading('Creando tarea...');
+    const toastId = toast.loading('Actualizando tarea...');
 
     try {
       if (onSubmit) {
-        await onSubmit({
-          subjectId: selectedSubjectId,
+        await onSubmit(assignment._id, {
           title,
           maxScore,
           dueDate,
@@ -130,10 +93,10 @@ export default function CreateAssignmentModal({
           iconKey: selectedIcon,
         });
       }
-      toast.success('¡Tarea creada con éxito!', { id: toastId });
+      toast.success('¡Tarea actualizada con éxito!', { id: toastId });
       onClose();
     } catch (err: any) {
-      toast.error(err.message || 'Error al crear la tarea', { id: toastId });
+      toast.error(err.message || 'Error al actualizar la tarea', { id: toastId });
     } finally {
       setLoading(false);
     }
@@ -146,73 +109,44 @@ export default function CreateAssignmentModal({
         {/* Cabecera del Modal */}
         <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-              <ClipboardList className="w-5 h-5 stroke-[2.2]" />
+            <div className="w-9 h-9 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
+              <Pencil className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
               <h2 className="text-lg font-black text-slate-900 tracking-tight leading-tight">
-                Crear Nueva Tarea
+                Editar Tarea
               </h2>
               <p className="text-[11px] font-semibold text-slate-400">
-                Personaliza la actividad, color e ícono de la tarjeta
+                {assignment.subject?.name ? `Materia: ${assignment.subject.name}` : 'Actualiza los datos de la actividad'}
               </p>
             </div>
           </div>
 
           {/* Botón Cerrar */}
-          <Button
+          <button
             type="button"
-            variant="ghost"
-            size="icon"
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-slate-100 text-slate-400 hover:text-slate-700 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer p-0"
+            className="w-7 h-7 rounded-full bg-slate-100 text-slate-400 hover:text-slate-700 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-4 h-4 stroke-[2.5]" />
-          </Button>
+          </button>
         </div>
 
         {/* Formulario en 2 columnas compacto */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          {/* Fila 1: Asignatura y Título */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-bold text-slate-600">
-                Asignatura Vinculada
-              </label>
-              <div className="relative">
-                <select
-                  value={selectedSubjectId}
-                  onChange={(e) => handleSubjectChange(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all appearance-none cursor-pointer"
-                  required
-                >
-                  {subjects.length === 0 ? (
-                    <option value="" disabled>No hay materias disponibles</option>
-                  ) : (
-                    subjects.map((sub) => (
-                      <option key={sub._id} value={sub._id}>
-                        {sub.name} {sub.code ? `(${sub.code})` : ''}
-                      </option>
-                    ))
-                  )}
-                </select>
-                <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-bold text-slate-600">
-                Título de la Tarea
-              </label>
-              <Input
-                type="text"
-                required
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ej. Taller de Fracciones"
-                className="text-xs font-semibold text-slate-800 placeholder:text-slate-300 py-2"
-              />
-            </div>
+          {/* Fila 1: Título de la Tarea (Full width) */}
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-bold text-slate-600">
+              Título de la Tarea
+            </label>
+            <Input
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ej. Taller de Fracciones"
+              className="text-xs font-semibold text-slate-800 placeholder:text-slate-300 py-2"
+            />
           </div>
 
           {/* Fila 2: Puntaje Máximo y Fecha de Entrega */}
@@ -332,7 +266,7 @@ export default function CreateAssignmentModal({
               leftIcon={<CheckCircle2 className="w-4 h-4 stroke-[2.5]" />}
               className="px-5 py-2 font-black shadow-md text-xs"
             >
-              {loading ? 'Creando...' : 'Crear Tarea'}
+              {loading ? 'Guardando...' : 'Guardar Cambios'}
             </Button>
           </div>
         </form>

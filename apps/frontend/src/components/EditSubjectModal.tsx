@@ -1,27 +1,31 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
-  BookOpen,
-  Palette,
-  Music,
-  FlaskConical,
-  Trophy,
-  DraftingCompass,
   Check,
   CheckCircle2,
+  Pencil,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
+import { SUBJECT_COLOR_OPTIONS, SUBJECT_ICON_OPTIONS } from './CreateSubjectModal';
 
-export interface CreateSubjectModalProps {
+export interface EditSubjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit?: (subject: {
+  subject: {
+    _id: string;
+    name: string;
+    description?: string;
+    code?: string;
+    color?: string;
+    iconKey?: string;
+  } | null;
+  onSubmit?: (id: string, updatedData: {
     name: string;
     description: string;
     iconKey: string;
@@ -29,44 +33,28 @@ export interface CreateSubjectModalProps {
   }) => Promise<void> | void;
 }
 
-export const SUBJECT_COLOR_OPTIONS = [
-  { id: 'sky', bgClass: 'bg-[#bae6fd]', hex: '#38bdf8', label: 'Cielo' },
-  { id: 'emerald', bgClass: 'bg-[#bbf7d0]', hex: '#4ade80', label: 'Menta' },
-  { id: 'amber', bgClass: 'bg-[#fef08a]', hex: '#facc15', label: 'Ámbar' },
-  { id: 'rose', bgClass: 'bg-[#fecdd3]', hex: '#fb7185', label: 'Rosa' },
-  { id: 'purple', bgClass: 'bg-[#e9d5ff]', hex: '#c084fc', label: 'Lavanda' },
-];
-
-export const SUBJECT_ICON_OPTIONS = [
-  { id: 'book', label: 'Libro', icon: BookOpen },
-  { id: 'math', label: 'Matemática', icon: DraftingCompass },
-  { id: 'science', label: 'Ciencia', icon: FlaskConical },
-  { id: 'art', label: 'Arte', icon: Palette },
-  { id: 'music', label: 'Música', icon: Music },
-  { id: 'sport', label: 'Deporte', icon: Trophy },
-];
-
-export default function CreateSubjectModal({
+export default function EditSubjectModal({
   isOpen,
   onClose,
+  subject,
   onSubmit,
-}: CreateSubjectModalProps) {
+}: EditSubjectModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedColor, setSelectedColor] = useState('sky');
   const [selectedIcon, setSelectedIcon] = useState('book');
   const [loading, setLoading] = useState(false);
 
-  React.useEffect(() => {
-    if (isOpen) {
-      setName('');
-      setDescription('');
-      setSelectedColor('sky');
-      setSelectedIcon('book');
+  useEffect(() => {
+    if (isOpen && subject) {
+      setName(subject.name || '');
+      setDescription(subject.description || '');
+      setSelectedColor(subject.color || 'sky');
+      setSelectedIcon(subject.iconKey || 'book');
     }
-  }, [isOpen]);
+  }, [isOpen, subject]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !subject) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,21 +64,21 @@ export default function CreateSubjectModal({
     }
 
     setLoading(true);
-    const toastId = toast.loading('Guardando materia...');
+    const toastId = toast.loading('Actualizando materia...');
 
     try {
       if (onSubmit) {
-        await onSubmit({
+        await onSubmit(subject._id, {
           name,
           description,
           iconKey: selectedIcon,
           color: selectedColor,
         });
       }
-      toast.success('¡Materia guardada con éxito!', { id: toastId });
+      toast.success('¡Materia actualizada con éxito!', { id: toastId });
       onClose();
     } catch (err: any) {
-      toast.error(err.message || 'Error al guardar la materia', { id: toastId });
+      toast.error(err.message || 'Error al actualizar la materia', { id: toastId });
     } finally {
       setLoading(false);
     }
@@ -104,14 +92,14 @@ export default function CreateSubjectModal({
         <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
-              <BookOpen className="w-5 h-5 stroke-[2.2]" />
+              <Pencil className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
               <h2 className="text-lg font-black text-slate-900 tracking-tight leading-tight">
-                Nueva Materia
+                Editar Asignatura
               </h2>
               <p className="text-[11px] font-semibold text-slate-400">
-                Organiza tus lecciones y cuadernillos QR
+                {subject.code ? `Código: ${subject.code}` : 'Modifica los datos de la asignatura'}
               </p>
             </div>
           </div>
@@ -240,7 +228,7 @@ export default function CreateSubjectModal({
               leftIcon={<CheckCircle2 className="w-4 h-4 stroke-[2.5]" />}
               className="px-5 py-2 font-black shadow-md text-xs"
             >
-              {loading ? 'Guardando...' : 'Guardar Materia'}
+              {loading ? 'Guardando...' : 'Guardar Cambios'}
             </Button>
           </div>
         </form>

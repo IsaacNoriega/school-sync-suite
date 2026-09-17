@@ -1,4 +1,7 @@
+'use client';
+
 import React from 'react';
+import { Button } from '@/components/ui';
 
 interface StudentQrModalProps {
   student: { name: string; qrCode: string } | null;
@@ -65,20 +68,20 @@ export default function StudentQrModal({
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <button 
-            className="btn btn-primary" 
+          <Button 
+            variant="primary"
             onClick={handlePrint}
-            style={{ width: '100%' }}
+            className="w-full"
           >
             Imprimir Código QR
-          </button>
-          <button 
-            className="btn btn-secondary" 
+          </Button>
+          <Button 
+            variant="secondary"
             onClick={onClose}
-            style={{ width: '100%' }}
+            className="w-full"
           >
             Cerrar
-          </button>
+          </Button>
         </div>
       </div>
     </div>
