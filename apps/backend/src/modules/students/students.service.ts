@@ -368,7 +368,7 @@ export class StudentsService {
       const status = dailyRecord?.status || 'ABSENT';
 
       const attendedDaysCount = monthlyCountMap.get(studentIdStr) || 0;
-      const attendanceRatio = `${attendedDaysCount} / ${activeDaysCount}`;
+      const attendanceRatio = `${attendedDaysCount} / ${daysInMonth}`;
 
       const scoreInfo = studentScoreTotals.get(studentIdStr);
       const homeworkScore =
@@ -390,7 +390,7 @@ export class StudentsService {
         status,
         scannedAt: dailyRecord?.scannedAt || null,
         attendedDaysCount,
-        daysInMonth: activeDaysCount,
+        daysInMonth,
         attendanceRatio,
         homeworkScore,
       };

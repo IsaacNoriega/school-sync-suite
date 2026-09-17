@@ -225,8 +225,10 @@ export default function DashboardClientView() {
       const avatarType = fallbacks[idx % fallbacks.length];
       const hwScore = typeof item.homeworkScore === 'number' ? Math.min(100, Math.max(0, item.homeworkScore)) : 0;
       
+      const [yearStr, monthStr] = (selectedDate || '').split('-');
+      const calDays = yearStr && monthStr ? new Date(Number(yearStr), Number(monthStr), 0).getDate() : 30;
       const attendedDays = item.attendedDaysCount ?? 0;
-      const totalDays = item.daysInMonth || 1;
+      const totalDays = item.daysInMonth && item.daysInMonth > 0 ? item.daysInMonth : calDays;
       const attPercent = totalDays > 0 ? Math.round((attendedDays / totalDays) * 100) : 0;
       const attRatio = `${attendedDays} / ${totalDays} Asistencias`;
 
@@ -419,9 +421,31 @@ export default function DashboardClientView() {
 
       // Actualización optimista de la lista local
       setStudents((prevList) =>
-        prevList.map((st) =>
-          st.id === studentId ? { ...st, status: newStatus } : st
-        )
+        prevList.map((st) => {
+          if (st.id !== studentId) return st;
+
+          let newAttendedDays = st.attendedDaysCount ?? 0;
+          const wasAttended = st.status === 'PRESENT' || st.status === 'LATE';
+          const isNowAttended = newStatus === 'PRESENT' || newStatus === 'LATE';
+
+          if (!wasAttended && isNowAttended) {
+            newAttendedDays += 1;
+          } else if (wasAttended && !isNowAttended) {
+            newAttendedDays = Math.max(0, newAttendedDays - 1);
+          }
+
+          const totalDays = st.daysInMonth && st.daysInMonth > 0 ? st.daysInMonth : 30;
+          const newPercent = totalDays > 0 ? Math.round((newAttendedDays / totalDays) * 100) : 0;
+          const newRatio = `${newAttendedDays} / ${totalDays} Asistencias`;
+
+          return {
+            ...st,
+            status: newStatus,
+            attendedDaysCount: newAttendedDays,
+            attendancePercent: newPercent,
+            attendanceRatio: newRatio,
+          };
+        })
       );
 
       // Actualización optimista de contadores KPI
