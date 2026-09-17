@@ -17,6 +17,13 @@ export class Subject extends Document {
 
   @Prop()
   description: string;
+
+  @Prop()
+  color: string;
+
+  @Prop()
+  iconKey: string;
 }
 
 export const SubjectSchema = SchemaFactory.createForClass(Subject);
+SubjectSchema.index({ teacher: 1 });

@@ -7,12 +7,14 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { User, UserSchema } from '../../database/schemas/user.schema';
 import { Teacher, TeacherSchema } from '../../database/schemas/teacher.schema';
+import { Subject, SubjectSchema } from '../../database/schemas/subject.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: Teacher.name, schema: TeacherSchema },
+      { name: Subject.name, schema: SubjectSchema },
     ]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({

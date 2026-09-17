@@ -21,6 +21,8 @@ export interface ISubject {
   name: string;
   code: string;
   description?: string;
+  color?: string;
+  iconKey?: string;
   createdAt?: string;
 }
 
@@ -40,6 +42,9 @@ export interface IAssignment {
   description?: string;
   maxScore: number;
   dueDate?: string;
+  code?: string;
+  color?: string;
+  iconKey?: string;
   createdAt?: string;
 }
 

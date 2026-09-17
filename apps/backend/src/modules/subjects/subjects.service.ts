@@ -1,16 +1,22 @@
 import { Injectable, ForbiddenException, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Subject, SubjectDocument } from '../../database/schemas/subject.schema';
+import { Assignment } from '../../database/schemas/assignment.schema';
 
 @Injectable()
 export class SubjectsService {
   constructor(
     @InjectModel(Subject.name) private subjectModel: Model<Subject>,
+    @InjectModel(Assignment.name) private assignmentModel: Model<Assignment>,
   ) {}
 
-  async create(teacherId: string, name: string, description?: string) {
-    const existingSubject = await this.subjectModel.findOne({ teacher: teacherId, name }).lean().exec();
+  async create(teacherId: string, name: string, description?: string, color?: string, iconKey?: string) {
+    const teacherQuery = Types.ObjectId.isValid(teacherId)
+      ? { $or: [{ teacher: teacherId }, { teacher: new Types.ObjectId(teacherId) }] }
+      : { teacher: teacherId };
+
+    const existingSubject = await this.subjectModel.findOne({ ...teacherQuery, name }).lean().exec();
     if (existingSubject) {
       throw new ConflictException('Ya tienes una asignatura registrada con este nombre.');
     }
@@ -34,11 +40,34 @@ export class SubjectsService {
       name,
       code,
       description,
+      color: color || 'sky',
+      iconKey: iconKey || 'book',
     });
   }
 
   async findAll(teacherId: string) {
-    return this.subjectModel.find({ teacher: teacherId }).lean().exec();
+    const teacherQuery = Types.ObjectId.isValid(teacherId)
+      ? { $or: [{ teacher: teacherId }, { teacher: new Types.ObjectId(teacherId) }] }
+      : { teacher: teacherId };
+
+    const subjects = await this.subjectModel.find(teacherQuery).sort({ createdAt: 1 }).lean().exec();
+    const enriched = await Promise.all(
+      subjects.map(async (s) => {
+        const subIdStr = s._id.toString();
+        const activeTasksCount = await this.assignmentModel.countDocuments({
+          $or: [
+            { subject: s._id },
+            { subject: subIdStr },
+            ...(Types.ObjectId.isValid(subIdStr) ? [{ subject: new Types.ObjectId(subIdStr) }] : []),
+          ],
+        });
+        return {
+          ...s,
+          activeTasksCount,
+        };
+      })
+    );
+    return enriched;
   }
 
   async findOne(teacherId: string, id: string) {
@@ -52,7 +81,7 @@ export class SubjectsService {
     return subject;
   }
 
-  async update(teacherId: string, id: string, name?: string, code?: string, description?: string) {
+  async update(teacherId: string, id: string, name?: string, code?: string, description?: string, color?: string, iconKey?: string) {
     await this.findOne(teacherId, id);
     if (name) {
       const existingSubject = await this.subjectModel.findOne({
@@ -65,15 +94,20 @@ export class SubjectsService {
       }
     }
 
+    const updatePayload: any = { name, code, description };
+    if (color !== undefined) updatePayload.color = color;
+    if (iconKey !== undefined) updatePayload.iconKey = iconKey;
+
     return this.subjectModel.findByIdAndUpdate(
       id,
-      { name, code, description },
+      updatePayload,
       { new: true },
     ).exec();
   }
 
   async remove(teacherId: string, id: string) {
     await this.findOne(teacherId, id);
+    await this.assignmentModel.deleteMany({ subject: id }).exec();
     return this.subjectModel.findByIdAndDelete(id).exec();
   }
 }

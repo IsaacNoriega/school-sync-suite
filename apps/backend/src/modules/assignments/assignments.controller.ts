@@ -21,6 +21,9 @@ export class AssignmentsController {
     @Body('description') description?: string,
     @Body('maxScore') maxScore?: number,
     @Body('dueDate') dueDate?: string,
+    @Body('code') code?: string,
+    @Body('color') color?: string,
+    @Body('iconKey') iconKey?: string,
   ) {
     let parsedDate: Date | undefined = undefined;
     if (dueDate && typeof dueDate === 'string' && dueDate.trim() !== '') {
@@ -29,7 +32,7 @@ export class AssignmentsController {
         parsedDate = d;
       }
     }
-    return this.assignmentsService.create(user.teacherId, subjectId, title, description, maxScore, parsedDate);
+    return this.assignmentsService.create(user.teacherId, subjectId, title, description, maxScore, parsedDate, code, color, iconKey);
   }
 
   @Post(':id/export')
@@ -64,7 +67,7 @@ export class AssignmentsController {
   @Get()
   findAllBySubject(
     @CurrentUser() user: any,
-    @Query('subjectId') subjectId: string,
+    @Query('subjectId') subjectId?: string,
   ) {
     return this.assignmentsService.findAllBySubject(user.teacherId, subjectId);
   }
@@ -82,6 +85,8 @@ export class AssignmentsController {
     @Body('description') description?: string,
     @Body('maxScore') maxScore?: number,
     @Body('dueDate') dueDate?: string,
+    @Body('color') color?: string,
+    @Body('iconKey') iconKey?: string,
   ) {
     let parsedDate: Date | undefined = undefined;
     if (dueDate && typeof dueDate === 'string' && dueDate.trim() !== '') {
@@ -90,7 +95,7 @@ export class AssignmentsController {
         parsedDate = d;
       }
     }
-    return this.assignmentsService.update(user.teacherId, id, title, description, maxScore, parsedDate);
+    return this.assignmentsService.update(user.teacherId, id, title, description, maxScore, parsedDate, color, iconKey);
   }
 
   @Delete(':id')

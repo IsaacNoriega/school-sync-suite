@@ -1,6 +1,6 @@
 import { Controller, Post, Body, UseGuards, Get, Patch, Param, ParseBoolPipe } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterTeacherDto, ChangePasswordDto } from './dto/auth.dto';
+import { LoginDto, RegisterTeacherDto, ChangePasswordDto, UpdateProfileDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
@@ -37,6 +37,41 @@ export class AuthController {
     @Body('isActive') isActive: boolean,
   ) {
     return this.authService.toggleTeacherStatus(userId, isActive);
+  }
+
+  @Patch('teachers/:userId/reset-password')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  async adminResetTeacherPassword(
+    @Param('userId') userId: string,
+    @Body('newPassword') newPassword: string,
+  ) {
+    return this.authService.adminResetTeacherPassword(userId, newPassword);
+  }
+
+  @Patch('teachers/:teacherId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  async updateTeacher(
+    @Param('teacherId') teacherId: string,
+    @Body() updateDto: { name?: string; schoolName?: string; schoolCycle?: string; entryTime?: string; shift?: string },
+  ) {
+    return this.authService.updateTeacher(teacherId, updateDto);
+  }
+
+  @Get('profile')
+  @UseGuards(JwtAuthGuard)
+  async getProfile(@CurrentUser() user: any) {
+    return this.authService.getProfile(user.userId);
+  }
+
+  @Patch('profile')
+  @UseGuards(JwtAuthGuard)
+  async updateProfile(
+    @CurrentUser() user: any,
+    @Body() updateDto: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(user.userId, updateDto);
   }
 
   @Post('change-password')

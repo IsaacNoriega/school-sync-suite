@@ -1,22 +1,43 @@
 import { Injectable, ForbiddenException, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Assignment, AssignmentDocument } from '../../database/schemas/assignment.schema';
+import { Grade } from '../../database/schemas/grade.schema';
+import { Student } from '../../database/schemas/student.schema';
 import { SubjectsService } from '../subjects/subjects.service';
 
 @Injectable()
 export class AssignmentsService {
   constructor(
     @InjectModel(Assignment.name) private assignmentModel: Model<Assignment>,
+    @InjectModel(Grade.name) private gradeModel: Model<Grade>,
+    @InjectModel(Student.name) private studentModel: Model<Student>,
     private subjectsService: SubjectsService,
   ) {}
 
-  async create(teacherId: string, subjectId: string, title: string, description?: string, maxScore = 10, dueDate?: Date) {
-    await this.subjectsService.findOne(teacherId, subjectId);
+  async create(
+    teacherId: string,
+    subjectId: string,
+    title: string,
+    description?: string,
+    maxScore = 10,
+    dueDate?: Date,
+    code?: string,
+    color?: string,
+    iconKey?: string,
+  ) {
+    const subject = await this.subjectsService.findOne(teacherId, subjectId);
 
     const existingAssignment = await this.assignmentModel.findOne({ subject: subjectId, title }).lean().exec();
     if (existingAssignment) {
       throw new ConflictException('Ya existe una tarea con este título en esta asignatura.');
+    }
+
+    let finalCode = code;
+    if (!finalCode) {
+      const count = await this.assignmentModel.countDocuments({ subject: subjectId });
+      const subCode = (subject.code || 'MAT').replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase();
+      finalCode = `QR-${subCode}-${String(count + 1).padStart(2, '0')}`;
     }
 
     return this.assignmentModel.create({
@@ -25,13 +46,69 @@ export class AssignmentsService {
       description,
       maxScore,
       dueDate,
+      code: finalCode,
+      color: color || (subject as any).color || 'sky',
+      iconKey: iconKey || (subject as any).iconKey || 'book',
     });
   }
 
-  async findAllBySubject(teacherId: string, subjectId: string) {
-    await this.subjectsService.findOne(teacherId, subjectId);
+  async findAllBySubject(teacherId: string, subjectId?: string) {
+    let query: any = {};
+    if (subjectId && subjectId !== 'all') {
+      await this.subjectsService.findOne(teacherId, subjectId);
+      query = Types.ObjectId.isValid(subjectId)
+        ? { $or: [{ subject: subjectId }, { subject: new Types.ObjectId(subjectId) }] }
+        : { subject: subjectId };
+    } else {
+      const subjects = await this.subjectsService.findAll(teacherId);
+      const subjectIds = subjects.map((s: any) => s._id);
+      const allSubjectIds = subjectIds.flatMap((id: any) => [
+        id,
+        id.toString(),
+        Types.ObjectId.isValid(id) ? new Types.ObjectId(id.toString()) : null
+      ]).filter(Boolean);
+      query = { subject: { $in: allSubjectIds } };
+    }
 
-    return this.assignmentModel.find({ subject: subjectId }).lean().exec();
+    const assignments = await this.assignmentModel.find(query)
+      .populate('subject')
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+
+    const teacherQuery = Types.ObjectId.isValid(teacherId)
+      ? { $or: [{ teacher: teacherId }, { teacher: new Types.ObjectId(teacherId) }] }
+      : { teacher: teacherId };
+
+    const totalStudents = await this.studentModel.countDocuments({
+      ...teacherQuery,
+      status: { $ne: 'inactive' },
+    });
+
+    const enriched = await Promise.all(
+      assignments.map(async (asg) => {
+        const asgIdStr = asg._id.toString();
+        const asgIdObj = Types.ObjectId.isValid(asgIdStr) ? new Types.ObjectId(asgIdStr) : asg._id;
+        const deliveredCount = await this.gradeModel.countDocuments({
+          assignment: { $in: [asg._id, asgIdStr, asgIdObj] },
+          score: { $ne: null }
+        });
+        let status: 'active' | 'completed' | 'pending' = 'active';
+        if (totalStudents > 0 && deliveredCount >= totalStudents) {
+          status = 'completed';
+        } else if (deliveredCount === 0) {
+          status = 'pending';
+        }
+        return {
+          ...asg,
+          deliveredCount,
+          totalStudents,
+          status,
+        };
+      })
+    );
+
+    return enriched;
   }
 
   async findOne(teacherId: string, id: string) {
@@ -46,7 +123,7 @@ export class AssignmentsService {
     return assignment;
   }
 
-  async update(teacherId: string, id: string, title?: string, description?: string, maxScore?: number, dueDate?: Date) {
+  async update(teacherId: string, id: string, title?: string, description?: string, maxScore?: number, dueDate?: Date, color?: string, iconKey?: string) {
     const assignment = await this.findOne(teacherId, id);
     if (title) {
       const existingAssignment = await this.assignmentModel.findOne({
@@ -59,15 +136,20 @@ export class AssignmentsService {
       }
     }
 
+    const updatePayload: any = { title, description, maxScore, dueDate };
+    if (color !== undefined) updatePayload.color = color;
+    if (iconKey !== undefined) updatePayload.iconKey = iconKey;
+
     return this.assignmentModel.findByIdAndUpdate(
       id,
-      { title, description, maxScore, dueDate },
+      updatePayload,
       { new: true },
     ).exec();
   }
 
   async remove(teacherId: string, id: string) {
     await this.findOne(teacherId, id);
+    await this.gradeModel.deleteMany({ assignment: id }).exec();
     return this.assignmentModel.findByIdAndDelete(id).exec();
   }
 }

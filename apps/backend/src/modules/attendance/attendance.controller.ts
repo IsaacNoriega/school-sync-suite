@@ -8,7 +8,7 @@ import { AttendanceStatus } from '@school-sync/shared';
 
 @Controller('attendance')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('TEACHER')
+@Roles('TEACHER', 'SUPER_ADMIN')
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
@@ -16,8 +16,9 @@ export class AttendanceController {
   scan(
     @CurrentUser() user: any,
     @Body('qrCode') qrCode: string,
+    @Body('date') date?: string,
   ) {
-    return this.attendanceService.scanAttendance(user.teacherId, qrCode);
+    return this.attendanceService.scanAttendance(user.teacherId, qrCode, date);
   }
 
   @Get('daily')

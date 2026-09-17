@@ -17,6 +17,33 @@ export class Student extends Document {
 
   @Prop()
   enrollmentNumber: string;
+
+  @Prop({ default: '3° B' })
+  group?: string;
+
+  @Prop({ default: 'Matutino' })
+  shift?: string;
+
+  @Prop({ default: 'Tutor Registrado' })
+  tutor?: string;
+
+  @Prop()
+  tutorPhone?: string;
+
+  @Prop({ default: 'EMITTED' })
+  status?: string;
 }
 
 export const StudentSchema = SchemaFactory.createForClass(Student);
+
+// Índice para consultas del docente con proyección de campos del dashboard
+StudentSchema.index({ teacher: 1, createdAt: -1 });
+
+// Índice para consulta + ordenamiento alfabético (directorio)
+StudentSchema.index({ teacher: 1, name: 1 });
+
+// Índice para búsqueda por grupo dentro de un maestro
+StudentSchema.index({ teacher: 1, group: 1 });
+
+// Índice para búsqueda por número de matrícula (escaneo QR con fallback)
+StudentSchema.index({ enrollmentNumber: 1 });

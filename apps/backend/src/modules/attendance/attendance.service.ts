@@ -1,6 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Attendance, AttendanceDocument } from '../../database/schemas/attendance.schema';
 import { StudentsService } from '../students/students.service';
 import { SubjectsService } from '../subjects/subjects.service';
@@ -16,20 +16,22 @@ export class AttendanceService {
     private appGateway: AppGateway,
   ) {}
 
-  async scanAttendance(teacherId: string, qrCode: string) {
+  async scanAttendance(teacherId: string, qrCode: string, date?: string) {
     const student = await this.studentsService.findByQrCode(qrCode);
     if (student.teacher.toString() !== teacherId) {
       throw new ForbiddenException('This student does not belong to you');
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = date && date.trim() ? date.trim() : new Date().toISOString().split('T')[0];
 
     let attendance = await this.attendanceModel.findOne({
       student: student._id,
       date: todayStr,
     }).populate('student', 'name').exec();
 
+    let alreadyScanned = false;
     if (attendance) {
+      alreadyScanned = true;
       attendance.status = 'PRESENT';
       attendance.scannedAt = new Date();
       await attendance.save();
@@ -47,54 +49,60 @@ export class AttendanceService {
       attendanceId: attendance._id,
       studentId: student._id,
       studentName: student.name,
+      enrollmentNumber: student.enrollmentNumber,
       status: attendance.status,
       date: attendance.date,
       scannedAt: attendance.scannedAt,
+      alreadyScanned,
     });
 
-    return attendance;
+    const attObj = typeof (attendance as any).toObject === 'function' ? (attendance as any).toObject() : attendance;
+    return {
+      ...attObj,
+      alreadyScanned,
+    };
   }
 
-  async getDailyAttendance(teacherId: string, date: string) {
-    const students = await this.studentsService.findAll(teacherId);
-    const studentIds = students.map(s => s._id);
-
-    const records = await this.attendanceModel.find({
-      student: { $in: studentIds },
-      date,
-    }).lean().exec();
-
-    return students.map(student => {
-      const record = records.find(r => r.student.toString() === student._id.toString());
-      return {
-        studentId: student._id,
-        name: student.name,
-        enrollmentNumber: student.enrollmentNumber,
-        qrCode: student.qrCode,
-        attendanceId: record?._id || null,
-        status: record?.status || 'ABSENT',
-        scannedAt: record?.scannedAt || null,
-      };
-    });
+  async getDailyAttendance(teacherId: string | undefined, date: string) {
+    return this.studentsService.getDashboardMetrics(teacherId, date);
   }
 
-  async manualCorrection(teacherId: string, studentId: string, date: string, status: AttendanceStatus) {
-    await this.studentsService.findOne(teacherId, studentId);
+  async manualCorrection(teacherId: string | undefined, studentId: string, date: string, status: AttendanceStatus) {
+    const student = await this.studentsService.findOne(teacherId, studentId);
 
-    let attendance = await this.attendanceModel.findOne({
-      student: studentId,
+    const studentObjectId = Types.ObjectId.isValid(studentId)
+      ? new Types.ObjectId(studentId)
+      : (Types.ObjectId.isValid(student._id) ? new Types.ObjectId(student._id.toString()) : student._id);
+
+    const studentIdStr = student._id.toString();
+
+    // Eliminar cualquier duplicado huérfano con string o ObjectId para este alumno y fecha
+    await this.attendanceModel.deleteMany({
+      $or: [
+        { student: studentObjectId },
+        { student: studentIdStr },
+      ],
       date,
     }).exec();
 
-    if (attendance) {
-      attendance.status = status;
-      await attendance.save();
-    } else {
-      attendance = await this.attendanceModel.create({
-        student: studentId,
-        date,
-        status,
-        scannedAt: new Date(),
+    // Crear el registro canónico único con Types.ObjectId consistente
+    const attendance = await this.attendanceModel.create({
+      student: studentObjectId,
+      date,
+      status,
+      scannedAt: status !== 'ABSENT' ? new Date() : null,
+    });
+
+    const targetTeacherId = teacherId || student.teacher?.toString();
+    if (targetTeacherId) {
+      this.appGateway.sendAttendanceScan(targetTeacherId, {
+        attendanceId: attendance._id,
+        studentId: student._id,
+        studentName: student.name,
+        enrollmentNumber: student.enrollmentNumber,
+        status: attendance.status,
+        date: attendance.date,
+        scannedAt: attendance.scannedAt,
       });
     }
 
