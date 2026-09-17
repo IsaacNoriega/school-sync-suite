@@ -68,12 +68,20 @@ export class AppGateway {
   sendAttendanceScan(teacherId: string, attendanceData: any) {
     const roomName = `teacher_${teacherId}`;
     this.server.to(roomName).emit(WS_EVENTS.STUDENT_SCANNED_ATTENDANCE, attendanceData);
+    this.server.to(roomName).emit('newScanRecord', {
+      type: 'attendance',
+      ...attendanceData,
+    });
     console.log(`Broadcasted attendance scan to room: ${roomName}`);
   }
 
   sendGradeScan(teacherId: string, gradeData: any) {
     const roomName = `teacher_${teacherId}`;
     this.server.to(roomName).emit(WS_EVENTS.STUDENT_SCANNED_GRADE, gradeData);
+    this.server.to(roomName).emit('newScanRecord', {
+      type: 'grade',
+      ...gradeData,
+    });
     console.log(`Broadcasted grade scan to room: ${roomName}`);
   }
 }

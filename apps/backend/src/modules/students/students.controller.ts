@@ -9,7 +9,7 @@ import * as path from 'path';
 
 @Controller('students')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('TEACHER')
+@Roles('TEACHER', 'SUPER_ADMIN')
 export class StudentsController {
   constructor(private readonly studentsService: StudentsService) {}
 
@@ -18,8 +18,13 @@ export class StudentsController {
     @CurrentUser() user: any,
     @Body('name') name: string,
     @Body('enrollmentNumber') enrollmentNumber?: string,
+    @Body('group') group?: string,
+    @Body('shift') shift?: string,
+    @Body('tutor') tutor?: string,
+    @Body('tutorPhone') tutorPhone?: string,
+    @Body('status') status?: string,
   ) {
-    return this.studentsService.create(user.teacherId, name, enrollmentNumber);
+    return this.studentsService.create(user.teacherId, name, enrollmentNumber, group, shift, tutor, tutorPhone, status);
   }
 
   @Post(':id/export')
@@ -69,8 +74,12 @@ export class StudentsController {
     @Param('id') id: string,
     @Body('name') name?: string,
     @Body('enrollmentNumber') enrollmentNumber?: string,
+    @Body('tutor') tutor?: string,
+    @Body('tutorPhone') tutorPhone?: string,
+    @Body('group') group?: string,
+    @Body('shift') shift?: string,
   ) {
-    return this.studentsService.update(user.teacherId, id, name, enrollmentNumber);
+    return this.studentsService.update(user.teacherId, id, name, enrollmentNumber, tutor, tutorPhone, group, shift);
   }
 
   @Delete(':id')

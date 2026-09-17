@@ -5,13 +5,15 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../../database/schemas/user.schema';
 import { Teacher } from '../../database/schemas/teacher.schema';
-import { LoginDto, RegisterTeacherDto, ChangePasswordDto } from './dto/auth.dto';
+import { Subject } from '../../database/schemas/subject.schema';
+import { LoginDto, RegisterTeacherDto, ChangePasswordDto, UpdateProfileDto } from './dto/auth.dto';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Teacher.name) private teacherModel: Model<Teacher>,
+    @InjectModel(Subject.name) private subjectModel: Model<Subject>,
     private jwtService: JwtService,
   ) {}
 
@@ -60,6 +62,9 @@ export class AuthService {
           teacherId: teacher._id.toString(),
           name: teacher.name,
           schoolName: teacher.schoolName,
+          schoolCycle: teacher.schoolCycle || '2025-2026',
+          entryTime: teacher.entryTime || '07:30',
+          shift: teacher.shift || 'Matutino',
         };
         payload['teacherId'] = teacher._id.toString();
       }
@@ -95,6 +100,9 @@ export class AuthService {
       user: user._id,
       name: registerDto.name,
       schoolName: registerDto.schoolName,
+      schoolCycle: registerDto.schoolCycle || '2025-2026',
+      entryTime: registerDto.entryTime || '07:30',
+      shift: registerDto.shift || 'Matutino',
     });
 
     return {
@@ -104,6 +112,9 @@ export class AuthService {
       teacherId: teacher._id,
       name: teacher.name,
       schoolName: teacher.schoolName,
+      schoolCycle: teacher.schoolCycle,
+      entryTime: teacher.entryTime,
+      shift: teacher.shift,
     };
   }
 
@@ -135,6 +146,128 @@ export class AuthService {
   }
 
   async listTeachers() {
-    return this.teacherModel.find().populate('user', 'email isActive').lean().exec();
+    const teachers = await this.teacherModel.find().populate('user', 'email isActive').lean().exec();
+    
+    // Enrich with subjects for each teacher
+    const teacherIds = teachers.map((t: any) => t._id);
+    const subjects = await this.subjectModel.find({ teacher: { $in: teacherIds } }).select('_id teacher name code').lean().exec();
+
+    const subjectsByTeacher = subjects.reduce((acc: Record<string, any[]>, sub: any) => {
+      const tId = sub.teacher.toString();
+      if (!acc[tId]) acc[tId] = [];
+      acc[tId].push(sub);
+      return acc;
+    }, {});
+
+    return teachers.map((t: any) => ({
+      ...t,
+      subjects: subjectsByTeacher[t._id.toString()] || [],
+    }));
+  }
+
+  async adminResetTeacherPassword(userId: string, newPassword: string) {
+    if (!newPassword || newPassword.length < 6) {
+      throw new ConflictException('La nueva contraseña debe tener al menos 6 caracteres');
+    }
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
+    user.passwordHash = await bcrypt.hash(newPassword, 12);
+    await user.save();
+    return { message: 'Contraseña restablecida exitosamente por el administrador' };
+  }
+
+  async updateTeacher(
+    teacherId: string,
+    updateDto: { name?: string; schoolName?: string; schoolCycle?: string; entryTime?: string; shift?: string },
+  ) {
+    const teacher = await this.teacherModel.findById(teacherId).exec();
+    if (!teacher) {
+      throw new ConflictException('Docente no encontrado');
+    }
+    if (updateDto.name && updateDto.name.trim()) {
+      teacher.name = updateDto.name.trim();
+    }
+    if (updateDto.schoolName && updateDto.schoolName.trim()) {
+      teacher.schoolName = updateDto.schoolName.trim();
+    }
+    if (updateDto.schoolCycle && updateDto.schoolCycle.trim()) {
+      teacher.schoolCycle = updateDto.schoolCycle.trim();
+    }
+    if (updateDto.entryTime && updateDto.entryTime.trim()) {
+      teacher.entryTime = updateDto.entryTime.trim();
+    }
+    if (updateDto.shift && updateDto.shift.trim()) {
+      teacher.shift = updateDto.shift.trim();
+    }
+    await teacher.save();
+    return teacher;
+  }
+
+  async getProfile(userId: string) {
+    const user = await this.userModel.findById(userId).lean().exec();
+    if (!user) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
+
+    let teacherDetails = null;
+    if (user.role === 'TEACHER') {
+      const teacher = await this.teacherModel.findOne({ user: user._id }).lean().exec();
+      if (teacher) {
+        teacherDetails = {
+          teacherId: teacher._id.toString(),
+          name: teacher.name,
+          schoolName: teacher.schoolName,
+          schoolCycle: teacher.schoolCycle || '2025-2026',
+          entryTime: teacher.entryTime || '07:30',
+          shift: teacher.shift || 'Matutino',
+        };
+      }
+    }
+
+    return {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+      isActive: user.isActive,
+      ...teacherDetails,
+    };
+  }
+
+  async updateProfile(userId: string, updateDto: UpdateProfileDto) {
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
+
+    let teacherDetails = null;
+    if (user.role === 'TEACHER') {
+      const teacher = await this.teacherModel.findOne({ user: user._id }).exec();
+      if (teacher) {
+        if (updateDto.name && updateDto.name.trim()) teacher.name = updateDto.name.trim();
+        if (updateDto.schoolName && updateDto.schoolName.trim()) teacher.schoolName = updateDto.schoolName.trim();
+        if (updateDto.schoolCycle && updateDto.schoolCycle.trim()) teacher.schoolCycle = updateDto.schoolCycle.trim();
+        if (updateDto.entryTime && updateDto.entryTime.trim()) teacher.entryTime = updateDto.entryTime.trim();
+        if (updateDto.shift && updateDto.shift.trim()) teacher.shift = updateDto.shift.trim();
+        await teacher.save();
+
+        teacherDetails = {
+          teacherId: teacher._id.toString(),
+          name: teacher.name,
+          schoolName: teacher.schoolName,
+          schoolCycle: teacher.schoolCycle,
+          entryTime: teacher.entryTime,
+          shift: teacher.shift,
+        };
+      }
+    }
+
+    return {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+      ...teacherDetails,
+    };
   }
 }
