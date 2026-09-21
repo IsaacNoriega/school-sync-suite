@@ -9,6 +9,7 @@ import { AssignmentsModule } from './modules/assignments/assignments.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { GradesModule } from './modules/grades/grades.module';
 import { GatewayModule } from './modules/gateway/gateway.module';
+import { SecurityModule } from './common/security/security.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -25,6 +26,7 @@ import { AppController } from './app.controller';
     AttendanceModule,
     GradesModule,
     GatewayModule,
+    SecurityModule,
   ],
   controllers: [AppController],
   providers: [
