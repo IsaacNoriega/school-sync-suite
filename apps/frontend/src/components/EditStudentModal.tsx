@@ -63,6 +63,22 @@ export default function EditStudentModal({
     }
   }, [isOpen, student]);
 
+  // Manejo accesible de cierre con tecla Escape y cleanup estricto
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen || !student) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -93,7 +109,12 @@ export default function EditStudentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200 select-none">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="edit-student-modal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200 select-none"
+    >
       {/* Tarjeta Principal del Modal */}
       <Card className="w-full max-w-lg bg-white rounded-3xl p-5 sm:p-6 shadow-2xl border border-slate-100 relative animate-in zoom-in-95 duration-200">
         {/* Cabecera del Modal */}
@@ -103,7 +124,10 @@ export default function EditStudentModal({
               <Pencil className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-slate-900 tracking-tight leading-tight">
+              <h2
+                id="edit-student-modal-title"
+                className="text-lg font-black text-slate-900 tracking-tight leading-tight"
+              >
                 Editar Información del Alumno
               </h2>
               <p className="text-[11px] font-semibold text-slate-400">
@@ -118,6 +142,7 @@ export default function EditStudentModal({
             variant="ghost"
             size="icon"
             onClick={onClose}
+            aria-label="Cerrar modal de edición de alumno"
             className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-700 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer p-0"
           >
             <X className="w-4 h-4 stroke-[2.5]" />
@@ -128,11 +153,16 @@ export default function EditStudentModal({
         <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
           {/* Nombre Completo */}
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+            <label
+              htmlFor="edit-student-name"
+              className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5"
+            >
               <User className="w-3.5 h-3.5 text-sky-500" />
               Nombre Completo del Alumno
             </label>
             <Input
+              id="edit-student-name"
+              name="name"
               type="text"
               required
               value={name}
@@ -144,11 +174,16 @@ export default function EditStudentModal({
 
           {/* Matrícula / ID */}
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+            <label
+              htmlFor="edit-student-enrollment"
+              className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5"
+            >
               <Hash className="w-3.5 h-3.5 text-sky-500" />
               Matrícula / ID
             </label>
             <Input
+              id="edit-student-enrollment"
+              name="enrollmentNumber"
               type="text"
               required
               value={enrollmentNumber}
@@ -161,11 +196,16 @@ export default function EditStudentModal({
           {/* Fila: Nombre Tutor y Teléfono Tutor */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <label
+                htmlFor="edit-student-tutor"
+                className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5"
+              >
                 <UserCheck className="w-3.5 h-3.5 text-sky-500" />
                 Nombre del Tutor
               </label>
               <Input
+                id="edit-student-tutor"
+                name="tutor"
                 type="text"
                 value={tutor}
                 onChange={(e) => setTutor(e.target.value)}
@@ -175,11 +215,16 @@ export default function EditStudentModal({
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <label
+                htmlFor="edit-student-phone"
+                className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5"
+              >
                 <Phone className="w-3.5 h-3.5 text-sky-500" />
                 Teléfono del Tutor
               </label>
               <Input
+                id="edit-student-phone"
+                name="tutorPhone"
                 type="tel"
                 value={tutorPhone}
                 onChange={(e) => setTutorPhone(e.target.value)}
@@ -217,3 +262,4 @@ export default function EditStudentModal({
     </div>
   );
 }
+
