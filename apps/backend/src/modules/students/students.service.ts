@@ -377,7 +377,7 @@ export class StudentsService {
           : 0;
 
       return {
-        studentId: student._id,
+        studentId: student._id.toString(),
         name: student.name,
         enrollmentNumber: student.enrollmentNumber || '',
         qrCode: student.qrCode || '',
@@ -386,7 +386,7 @@ export class StudentsService {
         group: student.group || '3° B',
         shift: student.shift || 'Matutino',
         badgeStatus: student.status || 'EMITTED',
-        attendanceId: dailyRecord?._id || null,
+        attendanceId: dailyRecord?._id ? dailyRecord._id.toString() : null,
         status,
         scannedAt: dailyRecord?.scannedAt || null,
         attendedDaysCount,

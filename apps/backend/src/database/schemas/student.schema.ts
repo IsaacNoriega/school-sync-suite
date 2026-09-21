@@ -6,7 +6,7 @@ export type StudentDocument = HydratedDocument<Student>;
 
 @Schema({ timestamps: true })
 export class Student extends Document {
-  @Prop({ type: Types.ObjectId, ref: 'Teacher', required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: 'Teacher', required: true })
   teacher: Types.ObjectId | Teacher;
 
   @Prop({ required: true })
