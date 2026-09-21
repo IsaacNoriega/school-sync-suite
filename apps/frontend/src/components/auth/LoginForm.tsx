@@ -17,6 +17,7 @@ import toast from 'react-hot-toast';
 import { API_BASE_URL } from '@/config/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { isTokenExpired, clearAuthSession } from '@/lib/auth';
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
@@ -32,16 +33,21 @@ export default function LoginForm() {
     const userStr = localStorage.getItem('user');
 
     if (token && userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        if (user.role === 'SUPER_ADMIN') {
-          router.push('/admin');
-        } else {
-          router.push('/dashboard');
+      if (isTokenExpired(token)) {
+        clearAuthSession();
+      } else {
+        try {
+          const user = JSON.parse(userStr);
+          if (user.role === 'SUPER_ADMIN') {
+            router.push('/admin');
+          } else {
+            router.push('/dashboard');
+          }
+          return;
+        } catch (err) {
+          console.error('Error reading stored session:', err);
+          clearAuthSession();
         }
-        return;
-      } catch (err) {
-        console.error('Error reading stored session:', err);
       }
     }
 

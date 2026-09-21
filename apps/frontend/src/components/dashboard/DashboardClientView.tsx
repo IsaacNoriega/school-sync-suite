@@ -19,6 +19,7 @@ import { Button, Badge } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { API_BASE_URL } from '@/config/api';
 import { connectSocket } from '@/lib/socket';
+import { handleAuthError, isTokenExpired } from '@/lib/auth';
 
 const StudentQrModal = dynamic(() => import('@/components/StudentQrModal'), { ssr: false });
 
@@ -113,7 +114,6 @@ const INITIAL_MOCK_STUDENTS: StudentDisplayItem[] = [];
 
 export default function DashboardClientView() {
   const router = useRouter();
-  const [selectedGroup, setSelectedGroup] = useState('Grupo 3° B');
   const [currentUser, setCurrentUser] = useState<{
     name?: string;
     schoolName?: string;
@@ -148,29 +148,37 @@ export default function DashboardClientView() {
 
   // Carga del perfil institucional actualizado del docente
   useEffect(() => {
+    const savedToken = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      try {
-        const u = JSON.parse(savedUser);
-        setCurrentUser(u);
-      } catch (e) {}
+
+    if (!savedToken || !savedUser || isTokenExpired(savedToken)) {
+      handleAuthError(router);
+      return;
     }
 
-    const token = localStorage.getItem('token');
-    if (token) {
-      fetch(`${API_BASE_URL}/auth/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
+    try {
+      const u = JSON.parse(savedUser);
+      setCurrentUser(u);
+    } catch (e) {}
+
+    fetch(`${API_BASE_URL}/auth/profile`, {
+      headers: { Authorization: `Bearer ${savedToken}` },
+    })
+      .then((res) => {
+        if (res.status === 401 || res.status === 403) {
+          handleAuthError(router);
+          return null;
+        }
+        return res.ok ? res.json() : null;
       })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((profile) => {
-          if (profile) {
-            setCurrentUser(profile);
-            localStorage.setItem('user', JSON.stringify(profile));
-          }
-        })
-        .catch((err) => console.warn('Error al cargar perfil docente:', err));
-    }
-  }, []);
+      .then((profile) => {
+        if (profile) {
+          setCurrentUser(profile);
+          localStorage.setItem('user', JSON.stringify(profile));
+        }
+      })
+      .catch((err) => console.warn('Error al cargar perfil docente:', err));
+  }, [router]);
 
   // Funciones para cambiar y formatear la fecha
   const changeDate = (days: number) => {
@@ -236,8 +244,12 @@ export default function DashboardClientView() {
         ? (item.enrollmentNumber.startsWith('#') ? item.enrollmentNumber : `#${item.enrollmentNumber}`)
         : 'Sin matrícula';
 
+      const resolvedStudentId = typeof item.studentId === 'string'
+        ? item.studentId
+        : (item.studentId?._id ? String(item.studentId._id) : (item.id || item._id ? String(item._id || item.id) : ''));
+
       return {
-        id: item.studentId || item.id || item._id,
+        id: resolvedStudentId,
         name: item.name,
         enrollment: rawEnrollment,
         qrCode: item.qrCode || '',
@@ -256,9 +268,7 @@ export default function DashboardClientView() {
       };
     });
 
-    if (sortedRecords.length > 0 && sortedRecords[0].group) {
-      setSelectedGroup(`Grupo ${sortedRecords[0].group}`);
-    }
+
 
     const total = mappedList.length;
     const pPercent = total > 0 ? Math.round((present / total) * 100) : 0;
@@ -348,7 +358,7 @@ export default function DashboardClientView() {
       const data: any[][] = [
         ['REPORTE DE ASISTENCIA DIARIA - EDUCAQR'],
         [`Fecha: ${selectedDate} (${formatDisplayDate(selectedDate)})`],
-        [`Grupo: ${selectedGroup}`],
+        [`Ciclo Escolar: ${currentUser?.schoolCycle || '2025-2026'}`],
         [`Total Alumnos: ${kpiStats.totalRegistered}`],
         [`Presentes: ${kpiStats.presentCount} (${kpiStats.presentPercent}%)`],
         [`Retardos: ${kpiStats.lateCount} (${kpiStats.latePercent}%)`],
@@ -483,6 +493,10 @@ export default function DashboardClientView() {
         };
       });
 
+      const cleanStudentId = typeof studentId === 'object' && studentId
+        ? String((studentId as any)._id || (studentId as any).id || studentId)
+        : String(studentId || '').trim();
+
       const res = await fetch(`${API_BASE_URL}/attendance/manual`, {
         method: 'POST',
         headers: {
@@ -490,7 +504,7 @@ export default function DashboardClientView() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          studentId,
+          studentId: cleanStudentId,
           date: selectedDate,
           status: newStatus,
         }),
@@ -605,7 +619,7 @@ export default function DashboardClientView() {
                   <span>{formatDisplayDate(selectedDate)}</span>
                 </Badge>
                 <span className="text-xs font-semibold text-slate-600">
-                  Turno {currentUser?.shift || 'Matutino'} • Ciclo {currentUser?.schoolCycle || '2025-2026'}
+                  Ciclo {currentUser?.schoolCycle || '2025-2026'}
                 </span>
               </div>
 

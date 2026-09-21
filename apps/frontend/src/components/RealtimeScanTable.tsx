@@ -1,11 +1,12 @@
 'use client';
 
 import React from 'react';
-import { ArrowUp, BookOpen, Info, Loader2, Mail, MessageCircle, QrCode, UserCheck } from 'lucide-react';
+import { ArrowUp, BookOpen, Calendar, Loader2, Mail, MessageCircle, QrCode, UserCheck } from 'lucide-react';
 import { Card, Button, Badge } from '@/components/ui';
 
 export interface GradeRecord {
   id: string;
+  studentId?: string;
   name: string;
   enrollment: string;
   scanTime: string;
@@ -19,6 +20,7 @@ export interface GradeRecord {
 
 export interface AttendanceRecord {
   id: string;
+  studentId?: string;
   name: string;
   enrollment: string;
   entryTime: string;
@@ -38,7 +40,6 @@ export interface RealtimeScanTableProps {
   attendanceRecords: AttendanceRecord[];
   loadingGrades: boolean;
   loadingAttendance: boolean;
-  onOpenCriteria?: () => void;
   onOpenHistory?: () => void;
 }
 
@@ -48,7 +49,6 @@ export const RealtimeScanTable = React.memo<RealtimeScanTableProps>(function Rea
   attendanceRecords,
   loadingGrades,
   loadingAttendance,
-  onOpenCriteria,
   onOpenHistory,
 }) {
   return (
@@ -60,17 +60,11 @@ export const RealtimeScanTable = React.memo<RealtimeScanTableProps>(function Rea
 
         <div className="flex items-center gap-3">
           <Button
-            variant="ghost"
-            leftIcon={<Info size={16} className="text-slate-400" />}
-            onClick={onOpenCriteria}
-            className="text-xs font-bold text-slate-500 hover:text-slate-900"
-          >
-            Criterios de Asistencia
-          </Button>
-          <Button
-            variant="ghost"
+            variant="outline"
+            size="sm"
+            leftIcon={<Calendar size={15} className="text-sky-600" />}
             onClick={onOpenHistory}
-            className="text-xs font-bold text-slate-500 hover:text-slate-900"
+            className="text-xs font-bold text-slate-700 hover:text-sky-600 hover:border-sky-300 transition-all shadow-2xs"
           >
             Historial Completo
           </Button>
@@ -129,7 +123,7 @@ export const RealtimeScanTable = React.memo<RealtimeScanTableProps>(function Rea
 
                   return (
                     <div
-                      key={record.id}
+                      key={record.studentId || record.id}
                       className="bg-white rounded-2xl p-4 grid grid-cols-12 gap-4 items-center border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-slate-200 transition-all duration-200"
                     >
                       {/* Columna 1: Avatar + Nombre + Matrícula */}
@@ -264,7 +258,7 @@ export const RealtimeScanTable = React.memo<RealtimeScanTableProps>(function Rea
 
                   return (
                     <div
-                      key={record.id}
+                      key={record.studentId || record.id}
                       className="bg-white rounded-2xl p-4 grid grid-cols-12 gap-4 items-center border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-slate-200 transition-all duration-200"
                     >
                       {/* Columna 1: Avatar + Nombre + Matrícula */}

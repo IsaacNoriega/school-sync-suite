@@ -7,9 +7,6 @@ import {
   Pencil,
   User,
   Hash,
-  Users,
-  Sun,
-  Moon,
   UserCheck,
   Phone,
 } from 'lucide-react';
@@ -22,9 +19,9 @@ export interface StudentDataForEdit {
   _id: string;
   name: string;
   enrollmentNumber: string;
-  group: string;
-  shift: string;
-  tutor: string;
+  group?: string;
+  shift?: string;
+  tutor?: string;
   tutorPhone?: string;
 }
 
@@ -37,10 +34,10 @@ export interface EditStudentModalProps {
     updatedData: {
       name: string;
       enrollmentNumber: string;
-      group: string;
-      shift: string;
       tutor: string;
       tutorPhone: string;
+      group?: string;
+      shift?: string;
     }
   ) => Promise<void> | void;
 }
@@ -53,8 +50,6 @@ export default function EditStudentModal({
 }: EditStudentModalProps) {
   const [name, setName] = useState('');
   const [enrollmentNumber, setEnrollmentNumber] = useState('');
-  const [group, setGroup] = useState('');
-  const [shift, setShift] = useState('Matutino');
   const [tutor, setTutor] = useState('');
   const [tutorPhone, setTutorPhone] = useState('');
   const [loading, setLoading] = useState(false);
@@ -63,8 +58,6 @@ export default function EditStudentModal({
     if (isOpen && student) {
       setName(student.name || '');
       setEnrollmentNumber(student.enrollmentNumber || '');
-      setGroup(student.group || '');
-      setShift(student.shift || 'Matutino');
       setTutor(student.tutor || '');
       setTutorPhone(student.tutorPhone || '');
     }
@@ -88,8 +81,6 @@ export default function EditStudentModal({
       await onSubmit(student._id, {
         name: name.trim(),
         enrollmentNumber: enrollmentNumber.trim(),
-        group: group.trim(),
-        shift,
         tutor: tutor.trim(),
         tutorPhone: tutorPhone.trim(),
       });
@@ -151,69 +142,20 @@ export default function EditStudentModal({
             />
           </div>
 
-          {/* Fila: Matrícula y Grupo */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                <Hash className="w-3.5 h-3.5 text-sky-500" />
-                Matrícula / ID
-              </label>
-              <Input
-                type="text"
-                required
-                value={enrollmentNumber}
-                onChange={(e) => setEnrollmentNumber(e.target.value)}
-                placeholder="Ej. #K-001"
-                className="text-xs font-semibold py-2 rounded-xl border-slate-200 focus:ring-sky-500"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                <Users className="w-3.5 h-3.5 text-sky-500" />
-                Grupo / Grado
-              </label>
-              <Input
-                type="text"
-                value={group}
-                onChange={(e) => setGroup(e.target.value)}
-                placeholder="Ej. Grupo 3º B"
-                className="text-xs font-semibold py-2 rounded-xl border-slate-200 focus:ring-sky-500"
-              />
-            </div>
-          </div>
-
-          {/* Turno */}
+          {/* Matrícula / ID */}
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-              Turno
+            <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <Hash className="w-3.5 h-3.5 text-sky-500" />
+              Matrícula / ID
             </label>
-            <div className="grid grid-cols-2 gap-2 bg-slate-50 border border-slate-200/80 rounded-xl p-1">
-              <button
-                type="button"
-                onClick={() => setShift('Matutino')}
-                className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  shift === 'Matutino'
-                    ? 'bg-white text-sky-700 shadow-2xs border border-sky-100'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Sun className="w-3.5 h-3.5 text-amber-500" />
-                Matutino
-              </button>
-              <button
-                type="button"
-                onClick={() => setShift('Vespertino')}
-                className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  shift === 'Vespertino'
-                    ? 'bg-white text-sky-700 shadow-2xs border border-sky-100'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Moon className="w-3.5 h-3.5 text-indigo-500" />
-                Vespertino
-              </button>
-            </div>
+            <Input
+              type="text"
+              required
+              value={enrollmentNumber}
+              onChange={(e) => setEnrollmentNumber(e.target.value)}
+              placeholder="Ej. #K-001"
+              className="text-xs font-semibold py-2 rounded-xl border-slate-200 focus:ring-sky-500"
+            />
           </div>
 
           {/* Fila: Nombre Tutor y Teléfono Tutor */}

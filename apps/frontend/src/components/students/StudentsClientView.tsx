@@ -137,8 +137,6 @@ export default function StudentsClientView() {
   const router = useRouter();
   const [fullName, setFullName] = useState('');
   const [enrollmentNumber, setEnrollmentNumber] = useState('');
-  const [group, setGroup] = useState('3° B');
-  const [shift, setShift] = useState('Matutino');
   const [tutorName, setTutorName] = useState('');
   const [tutorPhone, setTutorPhone] = useState('');
   const [currentUser, setCurrentUser] = useState<{
@@ -159,7 +157,6 @@ export default function StudentsClientView() {
       try {
         const u = JSON.parse(savedUser);
         setCurrentUser(u);
-        if (u.shift) setShift(u.shift);
       } catch (e) {}
     }
 
@@ -172,7 +169,6 @@ export default function StudentsClientView() {
         .then((profile) => {
           if (profile) {
             setCurrentUser(profile);
-            if (profile.shift) setShift(profile.shift);
             localStorage.setItem('user', JSON.stringify(profile));
           }
         })
@@ -219,8 +215,6 @@ export default function StudentsClientView() {
               qrCode: st.qrCode || `QR-${enrollment.replace('#', '')}`,
               tutor: st.tutor || '',
               tutorPhone: st.tutorPhone || '',
-              group: st.group || '3° B',
-              shift: st.shift || 'Matutino',
               timeLabel: formatTimeLabel(st.createdAt),
               avatarType: avatar,
               themeColor: theme,
@@ -274,8 +268,6 @@ export default function StudentsClientView() {
           enrollmentNumber: cleanEnrollment.replace('#', ''),
           tutor: tutorName.trim(),
           tutorPhone: tutorPhone.trim(),
-          group: group.trim() || '3° B',
-          shift: shift.trim() || 'Matutino',
         }),
       });
 
@@ -288,8 +280,6 @@ export default function StudentsClientView() {
           qrCode: saved.qrCode,
           tutor: saved.tutor || tutorName.trim() || '',
           tutorPhone: saved.tutorPhone || tutorPhone.trim() || '',
-          group: saved.group || group.trim() || '3° B',
-          shift: saved.shift || shift.trim() || 'Matutino',
           timeLabel: 'Hoy ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           avatarType: 'sofia',
           themeColor: 'emerald',
@@ -529,10 +519,6 @@ export default function StudentsClientView() {
               <div className="flex items-center justify-center gap-2 mt-1 flex-wrap">
                 <span className="text-xs font-bold text-sky-600">
                   {activePreviewStudent.enrollmentNumber}
-                </span>
-                <span className="text-slate-300">•</span>
-                <span className="text-xs font-semibold text-slate-500">
-                  {activePreviewStudent.group} ({activePreviewStudent.shift})
                 </span>
                 {activePreviewStudent.tutor && (
                   <>

@@ -1,7 +1,8 @@
-﻿'use client';
+'use client';
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { isTokenExpired, clearAuthSession } from '@/lib/auth';
 
 export default function AuthRedirect() {
   const router = useRouter();
@@ -11,18 +12,25 @@ export default function AuthRedirect() {
     const userStr = localStorage.getItem('user');
 
     if (token && userStr) {
+      if (isTokenExpired(token)) {
+        clearAuthSession();
+        router.replace('/login');
+        return;
+      }
+
       try {
         const user = JSON.parse(userStr);
         if (user.role === 'SUPER_ADMIN') {
-          router.push('/admin');
+          router.replace('/admin');
         } else {
-          router.push('/dashboard');
+          router.replace('/dashboard');
         }
       } catch {
-        router.push('/login');
+        clearAuthSession();
+        router.replace('/login');
       }
     } else {
-      router.push('/login');
+      router.replace('/login');
     }
   }, [router]);
 

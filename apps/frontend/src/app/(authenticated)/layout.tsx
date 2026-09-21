@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
 import { LayoutContext } from './layout-context';
 import { API_BASE_URL } from '@/config/api';
+import { isTokenExpired, clearAuthSession, handleAuthError } from '@/lib/auth';
 
 export default function AuthenticatedLayout({
   children,
@@ -37,8 +38,8 @@ export default function AuthenticatedLayout({
     const savedToken = localStorage.getItem('token');
     const savedUserStr = localStorage.getItem('user');
 
-    if (!savedToken || !savedUserStr) {
-      router.push('/login');
+    if (!savedToken || !savedUserStr || isTokenExpired(savedToken)) {
+      handleAuthError(router);
       return;
     }
 
@@ -65,7 +66,7 @@ export default function AuthenticatedLayout({
 
       setLoading(false);
     } catch {
-      router.push('/login');
+      handleAuthError(router);
       return;
     }
 
@@ -81,7 +82,10 @@ export default function AuthenticatedLayout({
             reconnectionAttempts: 5,
             reconnectionDelay: 1000,
             reconnectionDelayMax: 10000,
-            transports: ['websocket', 'polling']
+            transports: ['websocket', 'polling'],
+            auth: {
+              token: savedToken,
+            },
           });
           socketConnection = conn;
           setSocket(conn);
@@ -155,12 +159,11 @@ export default function AuthenticatedLayout({
   }, [pathname, user, router]);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    clearAuthSession();
     if (socket) {
       socket.disconnect();
     }
-    router.push('/login');
+    router.replace('/login');
   };
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';

@@ -137,8 +137,8 @@ interface DirectoryStudent {
   name: string;
   enrollmentNumber: string;
   qrCode: string;
-  group: string;
-  shift: string;
+  group?: string;
+  shift?: string;
   tutor: string;
   tutorPhone?: string;
   status: 'EMITTED' | 'PENDING';
@@ -154,7 +154,7 @@ export default function StudentsDirectoryClientView() {
   const [students, setStudents] = useState<DirectoryStudent[]>([]);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'printed' | 'pending' | 'morning'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'printed' | 'pending'>('all');
   const [sortBy, setSortBy] = useState<'alpha' | 'id'>('alpha');
   const [modalStudent, setModalStudent] = useState<{ name: string; qrCode: string } | null>(null);
   const [editingStudent, setEditingStudent] = useState<DirectoryStudent | null>(null);
@@ -225,8 +225,6 @@ export default function StudentsDirectoryClientView() {
               name: item.name,
               enrollmentNumber: enrollment,
               qrCode: item.qrCode || `QR-${enrollment.replace('#', '')}`,
-              group: item.group || '3° B',
-              shift: item.shift || currentUser?.shift || 'Matutino',
               tutor: item.tutor || 'Sin tutor asignado',
               tutorPhone: item.tutorPhone || '',
               status,
@@ -256,9 +254,8 @@ export default function StudentsDirectoryClientView() {
   const totalCount = students.length;
   const printedCount = students.filter((s) => s.status === 'EMITTED' && s.qrCode).length;
   const pendingCount = students.filter((s) => s.status === 'PENDING' || !s.qrCode).length;
-  const morningCount = students.filter((s) => s.shift === 'Matutino' || !s.shift).length;
+  const tutorCount = students.filter((s) => s.tutor && s.tutor !== 'Sin tutor asignado').length;
   const percentReady = totalCount > 0 ? Math.round((printedCount / totalCount) * 100) : 0;
-
 
   const filteredStudents = students
     .filter((s) => {
@@ -270,7 +267,6 @@ export default function StudentsDirectoryClientView() {
       if (!matchSearch) return false;
       if (activeFilter === 'printed') return s.status === 'EMITTED';
       if (activeFilter === 'pending') return s.status === 'PENDING';
-      if (activeFilter === 'morning') return s.shift === 'Matutino';
       return true;
     })
     .sort((a, b) => {
@@ -290,11 +286,11 @@ export default function StudentsDirectoryClientView() {
       toast.error('No hay alumnos para exportar');
       return;
     }
-    const header = 'ID,Nombre,Matricula,Grupo,Turno,Tutor,Estado,CodigoQR\n';
+    const header = 'ID,Nombre,Matricula,Tutor,TelefonoTutor,Estado,CodigoQR\n';
     const rows = students
       .map(
         (s) =>
-          `"${s._id}","${s.name}","${s.enrollmentNumber}","${s.group}","${s.shift}","${s.tutor}","${s.status}","${s.qrCode}"`
+          `"${s._id}","${s.name}","${s.enrollmentNumber}","${s.tutor}","${s.tutorPhone || ''}","${s.status}","${s.qrCode}"`
       )
       .join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
@@ -317,10 +313,10 @@ export default function StudentsDirectoryClientView() {
     updatedData: {
       name: string;
       enrollmentNumber: string;
-      group: string;
-      shift: string;
       tutor: string;
       tutorPhone: string;
+      group?: string;
+      shift?: string;
     }
   ) => {
     try {
@@ -413,7 +409,7 @@ export default function StudentsDirectoryClientView() {
               <p className="text-xs font-semibold text-slate-500 mt-1 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-sky-500"></span>
                 <span>
-                  {totalCount} alumnos inscritos en {students[0]?.group || '3° B'} • {currentUser?.schoolName || 'Primaria'} • Ciclo Escolar {currentUser?.schoolCycle || '2025-2026'}
+                  {totalCount} alumnos matriculados • {currentUser?.schoolName || 'Primaria'} • Ciclo Escolar {currentUser?.schoolCycle || '2025-2026'}
                 </span>
               </p>
             </div>
@@ -476,13 +472,13 @@ export default function StudentsDirectoryClientView() {
 
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-[0_2px_15px_rgba(0,0,0,0.02)]">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Turno {currentUser?.shift || 'Matutino'}</span>
+              <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Con Tutor Registrado</span>
               <div className="w-7 h-7 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
                 <Check size={14} />
               </div>
             </div>
-            <div className="text-3xl font-black text-slate-900 tracking-tight mt-2">{morningCount}</div>
-            <span className="text-[11px] font-bold text-slate-400">Entrada: {currentUser?.entryTime || '07:30'}</span>
+            <div className="text-3xl font-black text-slate-900 tracking-tight mt-2">{tutorCount}</div>
+            <span className="text-[11px] font-bold text-slate-400">Contacto disponible</span>
           </div>
         </div>
 

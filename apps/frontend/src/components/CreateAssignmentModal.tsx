@@ -68,12 +68,20 @@ export default function CreateAssignmentModal({
 
   React.useEffect(() => {
     if (isOpen) {
-      const initialSubjectId = defaultSubjectId || (subjects.length > 0 ? subjects[0]._id : '');
+      let rawId = defaultSubjectId;
+      if (!rawId || rawId === 'all' || rawId === '[object Object]') {
+        const first = subjects.length > 0 ? subjects[0]._id : '';
+        rawId = typeof first === 'object' && first !== null ? (first as any)._id || String(first) : String(first || '');
+      }
+      const initialSubjectId = typeof rawId === 'object' && rawId !== null ? (rawId as any)._id || String(rawId) : String(rawId || '');
       setSelectedSubjectId(initialSubjectId);
       setTitle('');
       setMaxScore(100);
       
-      const foundSub = subjects.find(s => s._id === initialSubjectId);
+      const foundSub = subjects.find((s: any) => {
+        const sId = typeof s._id === 'object' && s._id !== null ? (s._id as any)._id || String(s._id) : String(s._id);
+        return sId === initialSubjectId;
+      });
       if (foundSub?.color) {
         setSelectedColor(foundSub.color);
       } else {
@@ -92,9 +100,15 @@ export default function CreateAssignmentModal({
     }
   }, [isOpen, defaultSubjectId, subjects]);
 
-  const handleSubjectChange = (newSubjectId: string) => {
-    setSelectedSubjectId(newSubjectId);
-    const foundSub = subjects.find(s => s._id === newSubjectId);
+  const handleSubjectChange = (newSubjectId: any) => {
+    const cleanId = typeof newSubjectId === 'object' && newSubjectId !== null
+      ? (newSubjectId as any)._id || String(newSubjectId)
+      : String(newSubjectId || '');
+    setSelectedSubjectId(cleanId);
+    const foundSub = subjects.find((s: any) => {
+      const sId = typeof s._id === 'object' && s._id !== null ? (s._id as any)._id || String(s._id) : String(s._id);
+      return sId === cleanId;
+    });
     if (foundSub?.color) {
       setSelectedColor(foundSub.color);
     }
@@ -107,8 +121,12 @@ export default function CreateAssignmentModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSubjectId) {
-      toast.error('Por favor selecciona una asignatura');
+    const cleanSubjectId = typeof selectedSubjectId === 'object' && selectedSubjectId !== null
+      ? (selectedSubjectId as any)._id || String(selectedSubjectId)
+      : String(selectedSubjectId || '').trim();
+
+    if (!cleanSubjectId || cleanSubjectId === '[object Object]' || cleanSubjectId === 'all') {
+      toast.error('Por favor selecciona una asignatura válida');
       return;
     }
     if (!title.trim()) {
@@ -122,7 +140,7 @@ export default function CreateAssignmentModal({
     try {
       if (onSubmit) {
         await onSubmit({
-          subjectId: selectedSubjectId,
+          subjectId: cleanSubjectId,
           title,
           maxScore,
           dueDate,
@@ -189,11 +207,14 @@ export default function CreateAssignmentModal({
                   {subjects.length === 0 ? (
                     <option value="" disabled>No hay materias disponibles</option>
                   ) : (
-                    subjects.map((sub) => (
-                      <option key={sub._id} value={sub._id}>
-                        {sub.name} {sub.code ? `(${sub.code})` : ''}
-                      </option>
-                    ))
+                    subjects.map((sub: any) => {
+                      const subId = typeof sub._id === 'object' && sub._id !== null ? (sub._id as any)._id || String(sub._id) : String(sub._id);
+                      return (
+                        <option key={subId} value={subId}>
+                          {sub.name} {sub.code ? `(${sub.code})` : ''}
+                        </option>
+                      );
+                    })
                   )}
                 </select>
                 <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />

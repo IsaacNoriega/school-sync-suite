@@ -10,6 +10,7 @@ import { usePhysicalScanner } from '@/hooks/usePhysicalScanner';
 import EducaNavbar from '@/components/EducaNavbar';
 import RealtimeScanTable, { GradeRecord, AttendanceRecord } from '@/components/RealtimeScanTable';
 import { connectSocket } from '@/lib/socket';
+import { handleAuthError, isTokenExpired } from '@/lib/auth';
 
 import {
   ScanMode,
@@ -28,6 +29,14 @@ import ScannerCameraView from './ScannerCameraView';
 import ScannerUsbView from './ScannerUsbView';
 import ScanDetailModal from './ScanDetailModal';
 
+const getLocalTodayDateString = (): string => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 export default function ScannerClientView() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -38,7 +47,6 @@ export default function ScannerClientView() {
 
   const [scanMode, setScanMode] = useState<ScanMode>(initialMode);
   const [inputSource, setInputSource] = useState<InputSource>('camera');
-  const [selectedGroup, setSelectedGroup] = useState('Grupo 3° B');
   const [gradingScore, setGradingScore] = useState<number>(100);
   const [isTorchOn, setIsTorchOn] = useState(false);
   const [activeCameraId, setActiveCameraId] = useState<'environment' | 'user'>('environment');
@@ -87,6 +95,7 @@ export default function ScannerClientView() {
   const qrScannerRef = useRef<Html5Qrcode | null>(null);
   const isCameraRunningRef = useRef(false);
   const isCameraStartingRef = useRef(false);
+  const isCancelledRef = useRef(false);
   const cameraContainerRef = useRef<HTMLDivElement>(null);
   const [cameraReady, setCameraReady] = useState(false);
 
@@ -158,8 +167,8 @@ export default function ScannerClientView() {
     const savedToken = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
 
-    if (!savedToken || !savedUser) {
-      router.replace('/login');
+    if (!savedToken || !savedUser || isTokenExpired(savedToken)) {
+      handleAuthError(router);
       return;
     }
 
@@ -171,14 +180,20 @@ export default function ScannerClientView() {
       }
       setCurrentUser(u);
     } catch {
-      router.replace('/login');
+      handleAuthError(router);
       return;
     }
 
     fetch(`${API_BASE_URL}/auth/profile`, {
       headers: { Authorization: `Bearer ${savedToken}` },
     })
-      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => {
+        if (res.status === 401 || res.status === 403) {
+          handleAuthError(router);
+          return null;
+        }
+        return res.ok ? res.json() : null;
+      })
       .then((profile) => {
         if (profile) {
           if (profile.role === 'SUPER_ADMIN') {
@@ -203,9 +218,6 @@ export default function ScannerClientView() {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
           setTotalStudents(data.length);
-          if (data[0].group) {
-            setSelectedGroup(data[0].group);
-          }
         }
       }
     } catch (err) {
@@ -223,17 +235,26 @@ export default function ScannerClientView() {
       if (res.ok) {
         const data: SubjectOption[] = await res.json();
         setSubjects(data);
-        if (data.length > 0 && !selectedSubjectId) {
-          setSelectedSubjectId(data[0]._id);
+        if (data.length > 0) {
+          setSelectedSubjectId((prev) => prev || data[0]._id);
         }
       }
     } catch (err) {
       console.error('Error fetching subjects:', err);
     }
-  }, [selectedSubjectId]);
+  }, []);
 
   // Fetch Assignments for subject
-  const fetchAssignments = useCallback(async (subjectId: string) => {
+  const fetchAssignments = useCallback(async (rawSubjectId: any) => {
+    let subjectId = '';
+    if (rawSubjectId && rawSubjectId !== 'all') {
+      if (typeof rawSubjectId === 'object' && rawSubjectId !== null) {
+        subjectId = rawSubjectId._id || rawSubjectId.id || '';
+      } else if (typeof rawSubjectId === 'string' && rawSubjectId !== '[object Object]') {
+        subjectId = rawSubjectId.trim();
+      }
+    }
+
     if (!subjectId) {
       setAssignments([]);
       setSelectedAssignmentId('');
@@ -256,11 +277,13 @@ export default function ScannerClientView() {
         } else {
           setSelectedAssignmentId('');
         }
+      } else if (res.status === 401 || res.status === 403) {
+        handleAuthError(router);
       }
     } catch (err) {
       console.error('Error fetching assignments:', err);
     }
-  }, [initialAssignmentId]);
+  }, [initialAssignmentId, router]);
 
   // Fetch Grades for assignment
   const fetchGradesForAssignment = useCallback(async (assignmentId: string) => {
@@ -319,7 +342,7 @@ export default function ScannerClientView() {
   // Fetch Today Attendance
   const fetchTodayAttendance = useCallback(async () => {
     const token = getAuthToken();
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalTodayDateString();
     try {
       setLoadingAttendance(true);
       const res = await fetch(`${API_BASE_URL}/attendance/daily?date=${today}`, {
@@ -330,22 +353,39 @@ export default function ScannerClientView() {
         const attended = data.filter(item => item.status === 'PRESENT' || item.status === 'LATE');
         setAttendancePresentCount(attended.length);
 
+        // Ordenamiento determinista: más reciente primero, con desempate por nombre
         attended.sort((a, b) => {
           const timeA = a.scannedAt ? new Date(a.scannedAt).getTime() : 0;
           const timeB = b.scannedAt ? new Date(b.scannedAt).getTime() : 0;
-          return timeB - timeA;
+          if (timeB !== timeA) return timeB - timeA;
+          const nameA = a.name || '';
+          const nameB = b.name || '';
+          return nameA.localeCompare(nameB);
         });
+
+        // Deduplicación estricta por identidad del alumno
+        const seenStudentKeys = new Set<string>();
+        const uniqueAttended: any[] = [];
+        for (const item of attended) {
+          const sKey = String(item.studentId || item._id || item.enrollmentNumber || item.name).trim();
+          if (!seenStudentKeys.has(sKey)) {
+            seenStudentKeys.add(sKey);
+            uniqueAttended.push(item);
+          }
+        }
 
         const avatarColors = ['bg-[#bae6fd]', 'bg-[#fecdd3]', 'bg-[#fef08a]', 'bg-[#fed7aa]'];
 
-        const mapped: AttendanceRecord[] = attended.map((item, idx) => {
+        const mapped: AttendanceRecord[] = uniqueAttended.map((item, idx) => {
           const isLate = item.status === 'LATE';
           const avatarBg = avatarColors[idx % avatarColors.length];
+          const studentId = String(item.studentId || item._id || '').trim();
 
           return {
-            id: item.attendanceId || item.studentId,
+            id: String(item.attendanceId || item._id || studentId),
+            studentId,
             name: item.name,
-            enrollment: item.enrollmentNumber || '#EQR-0000',
+            enrollment: item.enrollmentNumber ? `#${item.enrollmentNumber.replace(/^#/, '')}` : '#EQR-0000',
             entryTime: formatTime(item.scannedAt),
             entryPoint: isLate ? 'Tolerancia (+3m)' : 'Puerta Principal',
             status: isLate ? 'justified' : 'punctual',
@@ -388,13 +428,30 @@ export default function ScannerClientView() {
   // Realtime updates
   const handleNewAttendanceRecord = useCallback((data: any) => {
     const isLate = data.status === 'LATE';
-    const cleanEnrollment = (data.enrollmentNumber || '#EQR-0000').replace(/^#/, '');
+    const studentId = String(
+      data.studentId?._id || data.studentId || data.student?._id || data.student || ''
+    ).trim();
+    const rawEnrollment =
+      data.enrollmentNumber ||
+      data.studentEnrollment ||
+      data.student?.enrollmentNumber ||
+      data.student?.enrollment ||
+      '';
+    const cleanEnrollment = rawEnrollment.replace(/^#/, '').trim() || 'EQR-0000';
+    const studentName = String(
+      data.studentName || data.name || data.student?.name || 'Alumno Registrado'
+    ).trim();
+
+    const scanTimestamp = data.scannedAt || data.timestamp || new Date();
+    const scanTimeFormatted = formatTime(scanTimestamp);
+    const recordId = String(data.attendanceId || data._id || studentId || `att-${Date.now()}`);
 
     const newRecord: AttendanceRecord = {
-      id: data.attendanceId || data.studentId || `att-${Date.now()}`,
-      name: data.studentName || data.name || 'Alumno Registrado',
+      id: recordId,
+      studentId: studentId || undefined,
+      name: studentName,
       enrollment: `#${cleanEnrollment}`,
-      entryTime: formatTime(data.scannedAt),
+      entryTime: scanTimeFormatted,
       entryPoint: isLate ? 'Tolerancia (+3m)' : 'Puerta Principal',
       status: isLate ? 'justified' : 'punctual',
       statusText: isLate ? 'Retardo Justificado' : 'Asistencia Puntual',
@@ -406,34 +463,40 @@ export default function ScannerClientView() {
     };
 
     setAttendanceRecords((prev) => {
-      const exists = prev.some(
-        (r) =>
-          r.id === newRecord.id ||
-          (r.enrollment && r.enrollment !== '#EQR-0000' && r.enrollment === newRecord.enrollment) ||
-          r.name === newRecord.name
-      );
+      const isSameStudent = (r: AttendanceRecord) => {
+        if (studentId && r.studentId && r.studentId === studentId) return true;
+        if (cleanEnrollment !== 'EQR-0000' && r.enrollment.replace(/^#/, '') === cleanEnrollment) return true;
+        if (
+          studentName &&
+          studentName !== 'Alumno Registrado' &&
+          studentName !== 'Estudiante' &&
+          r.name.toLowerCase().trim() === studentName.toLowerCase()
+        ) {
+          return true;
+        }
+        if (r.id === newRecord.id) return true;
+        return false;
+      };
 
-      if (exists) {
-        return prev.map((r) =>
-          r.id === newRecord.id || r.enrollment === newRecord.enrollment || r.name === newRecord.name
-            ? { ...r, entryTime: newRecord.entryTime }
-            : r
-        );
+      const existingRecord = prev.find(isSameStudent);
+      if (!existingRecord) {
+        setAttendancePresentCount((count) => count + 1);
       }
 
-      setAttendancePresentCount((count) => count + 1);
-      return [newRecord, ...prev];
+      // Eliminar ocurrencia previa para evitar duplicados o triplicados, y colocar al alumno al frente
+      const filtered = prev.filter((r) => !isSameStudent(r));
+      return [newRecord, ...filtered];
     });
 
     setLastAttendanceFeedback({
-      name: newRecord.name,
+      name: studentName,
       enrollment: cleanEnrollment,
-      time: newRecord.entryTime,
+      time: scanTimeFormatted,
       statusText: isLate ? 'Retardo Justificado' : 'Asistencia Puntual',
       points: 5,
-      studentId: newRecord.id,
+      studentId: studentId || newRecord.id,
     });
-    setLastScannedCode(`EQR-${cleanEnrollment}-${newRecord.name.toUpperCase().replace(/\s+/g, '-')}`);
+    setLastScannedCode(`EQR-${cleanEnrollment}-${studentName.toUpperCase().replace(/\s+/g, '-')}`);
     setLastScannedSecondsAgo(0);
   }, []);
 
@@ -441,13 +504,30 @@ export default function ScannerClientView() {
     const score = data.score ?? 100;
     const points = score >= 90 ? 10 : 5;
     const timeStatus = score >= 90 ? 'A tiempo' : 'Tolerancia (+3m)';
-    const cleanEnrollment = (data.enrollmentNumber || '#EQR-0000').replace(/^#/, '');
+    const studentId = String(
+      data.studentId?._id || data.studentId || data.student?._id || data.student || ''
+    ).trim();
+    const rawEnrollment =
+      data.enrollmentNumber ||
+      data.studentEnrollment ||
+      data.student?.enrollmentNumber ||
+      data.student?.enrollment ||
+      '';
+    const cleanEnrollment = rawEnrollment.replace(/^#/, '').trim() || 'EQR-0000';
+    const studentName = String(
+      data.studentName || data.name || data.student?.name || 'Alumno Registrado'
+    ).trim();
+
+    const scanTimestamp = data.gradedAt || data.timestamp || new Date();
+    const scanTimeFormatted = formatTime(scanTimestamp);
+    const recordId = String(data.gradeId || data._id || studentId || `grd-${Date.now()}`);
 
     const newRecord: GradeRecord = {
-      id: data.gradeId || data.studentId || `grd-${Date.now()}`,
-      name: data.studentName || data.name || 'Alumno Registrado',
+      id: recordId,
+      studentId: studentId || undefined,
+      name: studentName,
       enrollment: `#${cleanEnrollment}`,
-      scanTime: formatTime(data.gradedAt),
+      scanTime: scanTimeFormatted,
       timeStatus,
       score,
       points,
@@ -457,25 +537,35 @@ export default function ScannerClientView() {
     };
 
     setGradeRecords((prev) => {
-      const filtered = prev.filter(
-        (r) =>
-          r.id !== newRecord.id &&
-          (r.enrollment === '#EQR-0000' || r.enrollment !== newRecord.enrollment) &&
-          r.name !== newRecord.name
-      );
+      const isSameStudent = (r: GradeRecord) => {
+        if (studentId && r.studentId && r.studentId === studentId) return true;
+        if (cleanEnrollment !== 'EQR-0000' && r.enrollment.replace(/^#/, '') === cleanEnrollment) return true;
+        if (
+          studentName &&
+          studentName !== 'Alumno Registrado' &&
+          studentName !== 'Estudiante' &&
+          r.name.toLowerCase().trim() === studentName.toLowerCase()
+        ) {
+          return true;
+        }
+        if (r.id === newRecord.id) return true;
+        return false;
+      };
+
+      const filtered = prev.filter((r) => !isSameStudent(r));
       return [newRecord, ...filtered];
     });
 
     setLastGradeFeedback({
-      name: newRecord.name,
+      name: studentName,
       enrollment: cleanEnrollment,
-      time: newRecord.scanTime,
+      time: scanTimeFormatted,
       points,
       score,
       action: data.alreadyGraded ? 'Nota Actualizada' : 'Pase de Lista Exitoso',
-      studentId: newRecord.id,
+      studentId: studentId || newRecord.id,
     });
-    setLastScannedCode(`EQR-${cleanEnrollment}-${newRecord.name.toUpperCase().replace(/\s+/g, '-')}`);
+    setLastScannedCode(`EQR-${cleanEnrollment}-${studentName.toUpperCase().replace(/\s+/g, '-')}`);
     setLastScannedSecondsAgo(0);
   }, []);
 
@@ -500,19 +590,71 @@ export default function ScannerClientView() {
         };
 
         socket.on('newScanRecord', handleScan);
-        socket.on('student_scanned_attendance', (data) => handleScan({ type: 'attendance', ...data }));
-        socket.on('student_scanned_grade', (data) => handleScan({ type: 'grade', ...data }));
 
         return () => {
           socket.off('newScanRecord', handleScan);
-          socket.off('student_scanned_attendance');
-          socket.off('student_scanned_grade');
         };
       }
     } catch (err) {
       console.error('Error al inicializar WebSockets en escáner:', err);
     }
   }, [handleNewAttendanceRecord, handleNewGradeRecord]);
+
+  // Sincronizador resiliente de cola offline ante interrupciones de WiFi escolar
+  useEffect(() => {
+    const syncOfflineScans = async () => {
+      if (typeof window === 'undefined' || !navigator.onLine) return;
+      const rawQueue = localStorage.getItem('school_sync_offline_scans');
+      if (!rawQueue) return;
+
+      try {
+        const queue: { qrCode: string; date: string }[] = JSON.parse(rawQueue);
+        if (!Array.isArray(queue) || queue.length === 0) return;
+
+        const token = getAuthToken();
+        if (!token) return;
+
+        toast.loading(`Sincronizando ${queue.length} asistencias registradas offline...`, { id: 'offline-sync' });
+        const remaining: typeof queue = [];
+
+        for (const item of queue) {
+          try {
+            const res = await fetch(`${API_BASE_URL}/attendance/scan`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify(item),
+            });
+            if (!res.ok) remaining.push(item);
+          } catch {
+            remaining.push(item);
+          }
+        }
+
+        if (remaining.length === 0) {
+          localStorage.removeItem('school_sync_offline_scans');
+          toast.success('Todas las asistencias offline fueron sincronizadas', { id: 'offline-sync' });
+          fetchTodayAttendance();
+        } else {
+          localStorage.setItem('school_sync_offline_scans', JSON.stringify(remaining));
+          toast.error(`${remaining.length} asistencias pendientes de sincronizar`, { id: 'offline-sync' });
+        }
+      } catch (e) {
+        console.error('Error al procesar sincronización offline:', e);
+      }
+    };
+
+    window.addEventListener('online', syncOfflineScans);
+    if (navigator.onLine) {
+      syncOfflineScans();
+    }
+
+    return () => {
+      window.removeEventListener('online', syncOfflineScans);
+    };
+  }, [fetchTodayAttendance]);
 
   // QR Scanning Processor
   const handleProcessScan = useCallback(async (code: string) => {
@@ -591,15 +733,9 @@ export default function ScannerClientView() {
         toast.error(err.message || 'Error al registrar calificación');
       }
     } else {
-      try {
-        const todayStr = (() => {
-          const now = new Date();
-          const y = now.getFullYear();
-          const m = String(now.getMonth() + 1).padStart(2, '0');
-          const d = String(now.getDate()).padStart(2, '0');
-          return `${y}-${m}-${d}`;
-        })();
+      const todayStr = getLocalTodayDateString();
 
+      try {
         const res = await fetch(`${API_BASE_URL}/attendance/scan`, {
           method: 'POST',
           headers: {
@@ -633,8 +769,23 @@ export default function ScannerClientView() {
           toast.success(`Asistencia registrada: ${studentName}`);
         }
       } catch (err: any) {
-        soundFeedback.playError();
-        toast.error(err.message || 'Error al registrar asistencia');
+        const isNetworkDrop = typeof navigator !== 'undefined' && (!navigator.onLine || err?.message?.includes('Failed to fetch') || err?.name === 'TypeError');
+        if (isNetworkDrop) {
+          // Encolar asistencia localmente ante corte de conexión en el aula
+          const queueKey = 'school_sync_offline_scans';
+          const queue = JSON.parse(localStorage.getItem(queueKey) || '[]');
+          queue.push({ qrCode: trimmed, date: todayStr });
+          localStorage.setItem(queueKey, JSON.stringify(queue));
+
+          soundFeedback.playSuccess();
+          toast('📶 Sin conexión: Asistencia guardada localmente. Se sincronizará automáticamente al volver el WiFi.', {
+            duration: 5000,
+            icon: '💾',
+          });
+        } else {
+          soundFeedback.playError();
+          toast.error(err.message || 'Error al registrar asistencia');
+        }
       }
     }
   }, [handleNewGradeRecord, handleNewAttendanceRecord]);
@@ -714,12 +865,21 @@ export default function ScannerClientView() {
         qrCodeSuccessCallback,
         () => {}
       );
+
+      // Si el componente se desmontó mientras la cámara iniciaba, abortar y detenerla
+      if (isCancelledRef.current) {
+        if (qrScannerRef.current?.isScanning) {
+          await qrScannerRef.current.stop();
+        }
+        return;
+      }
+
       isCameraRunningRef.current = true;
       setCameraReady(true);
     } catch (e: any) {
       console.warn('Cámara no disponible o bloqueada:', e);
       try {
-        if (qrScannerRef.current && !isCameraRunningRef.current) {
+        if (qrScannerRef.current && !isCameraRunningRef.current && !isCancelledRef.current) {
           await qrScannerRef.current.start(
             { facingMode: 'user' },
             { fps: 15, qrbox: { width: 250, height: 250 } },
@@ -730,6 +890,14 @@ export default function ScannerClientView() {
             },
             () => {}
           );
+
+          if (isCancelledRef.current) {
+            if (qrScannerRef.current?.isScanning) {
+              await qrScannerRef.current.stop();
+            }
+            return;
+          }
+
           isCameraRunningRef.current = true;
           setCameraReady(true);
         }
@@ -743,6 +911,7 @@ export default function ScannerClientView() {
   };
 
   const stopCamera = async () => {
+    isCancelledRef.current = true;
     if (qrScannerRef.current) {
       try {
         if (qrScannerRef.current.isScanning) {
@@ -877,6 +1046,7 @@ export default function ScannerClientView() {
           attendanceRecords={attendanceRecords}
           loadingGrades={loadingGrades}
           loadingAttendance={loadingAttendance}
+          onOpenHistory={() => router.push('/attendance')}
         />
       </main>
 

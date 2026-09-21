@@ -20,7 +20,7 @@ export interface NavigationItem {
 }
 
 export interface EducaNavbarProps {
-  activeTab?: 'dashboard' | 'scanner' | 'students' | 'subjects' | 'reports' | 'admin' | string;
+  activeTab?: 'dashboard' | 'scanner' | 'attendance' | 'students' | 'subjects' | 'reports' | 'admin' | string;
   onNavigate?: (id: string) => void;
   currentGroup?: string;
   teacherName?: string;
@@ -47,6 +47,7 @@ export const EducaNavbar: React.FC<EducaNavbarProps> = ({
   const initialActive = (() => {
     if (activeTab && activeTab !== 'dashboard') return activeTab;
     if (pathname?.includes('/scanner')) return 'scanner';
+    if (pathname?.includes('/attendance')) return 'attendance';
     if (pathname?.includes('/students')) return 'students';
     if (pathname?.includes('/subjects')) return 'subjects';
     if (pathname?.includes('/admin')) return 'admin';
@@ -104,6 +105,12 @@ export const EducaNavbar: React.FC<EducaNavbarProps> = ({
           isSpecial: true, // "Joya de la corona"
           tooltip: 'Pase de lista y calificación continua',
           path: '/scanner',
+        },
+        {
+          id: 'attendance',
+          label: 'Historial Asistencia',
+          tooltip: 'Historial diario y reportes mensuales con exportación a Excel',
+          path: '/attendance',
         },
         {
           id: 'students',

@@ -27,6 +27,7 @@ import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { Button, Input, Card, Badge } from '@/components/ui';
 import { API_BASE_URL } from '@/config/api';
+import { handleAuthError } from '@/lib/auth';
 
 const ChangePasswordModal = dynamic(() => import('@/components/ChangePasswordModal'), { ssr: false });
 
@@ -95,7 +96,7 @@ export default function AdminClientView() {
   const fetchTeachers = useCallback(async () => {
     const token = localStorage.getItem('token');
     if (!token) {
-      router.push('/login');
+      handleAuthError(router);
       return;
     }
 
@@ -109,8 +110,7 @@ export default function AdminClientView() {
 
       if (!res.ok) {
         if (res.status === 401 || res.status === 403) {
-          toast.error('Sesión no autorizada o expirada');
-          router.push('/login');
+          handleAuthError(router, 'Sesión no autorizada o expirada');
           return;
         }
         throw new Error('Error al consultar lista de maestros');
