@@ -4,8 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import * as fs from 'fs';
-import * as path from 'path';
+import { CreateStudentDto, UpdateStudentDto } from './dto/student.dto';
 
 @Controller('students')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -16,41 +15,18 @@ export class StudentsController {
   @Post()
   create(
     @CurrentUser() user: any,
-    @Body('name') name: string,
-    @Body('enrollmentNumber') enrollmentNumber?: string,
-    @Body('group') group?: string,
-    @Body('shift') shift?: string,
-    @Body('tutor') tutor?: string,
-    @Body('tutorPhone') tutorPhone?: string,
-    @Body('status') status?: string,
+    @Body() createStudentDto: CreateStudentDto,
   ) {
-    return this.studentsService.create(user.teacherId, name, enrollmentNumber, group, shift, tutor, tutorPhone, status);
-  }
-
-  @Post(':id/export')
-  exportToLocalDisk(
-    @Param('id') id: string,
-    @Body('studentName') studentName: string,
-    @Body('csvContent') csvContent: string,
-  ) {
-    const safeStudentName = studentName.replace(/[^a-zA-Z0-9_áéíóúÁÉÍÓÚñÑ\- ]/g, '_');
-    const os = require('os');
-    const exportsDir = path.resolve(os.tmpdir(), 'educaqr_exports', 'Alumnos');
-    
-    if (!fs.existsSync(exportsDir)) {
-      fs.mkdirSync(exportsDir, { recursive: true });
-    }
-    
-    const filePath = path.resolve(exportsDir, `Reporte_${safeStudentName}.csv`);
-    
-    // Path traversal mitigation
-    if (!filePath.startsWith(exportsDir)) {
-      throw new Error('Invalid file path');
-    }
-    
-    fs.writeFileSync(filePath, csvContent, 'utf8');
-    
-    return { success: true, path: filePath };
+    return this.studentsService.create(
+      user.teacherId,
+      createStudentDto.name,
+      createStudentDto.enrollmentNumber,
+      createStudentDto.group,
+      createStudentDto.shift,
+      createStudentDto.tutor,
+      createStudentDto.tutorPhone,
+      createStudentDto.status,
+    );
   }
 
   @Get()
@@ -72,14 +48,18 @@ export class StudentsController {
   update(
     @CurrentUser() user: any,
     @Param('id') id: string,
-    @Body('name') name?: string,
-    @Body('enrollmentNumber') enrollmentNumber?: string,
-    @Body('tutor') tutor?: string,
-    @Body('tutorPhone') tutorPhone?: string,
-    @Body('group') group?: string,
-    @Body('shift') shift?: string,
+    @Body() updateStudentDto: UpdateStudentDto,
   ) {
-    return this.studentsService.update(user.teacherId, id, name, enrollmentNumber, tutor, tutorPhone, group, shift);
+    return this.studentsService.update(
+      user.teacherId,
+      id,
+      updateStudentDto.name,
+      updateStudentDto.enrollmentNumber,
+      updateStudentDto.tutor,
+      updateStudentDto.tutorPhone,
+      updateStudentDto.group,
+      updateStudentDto.shift,
+    );
   }
 
   @Delete(':id')
@@ -87,3 +67,4 @@ export class StudentsController {
     return this.studentsService.remove(user.teacherId, id);
   }
 }
+

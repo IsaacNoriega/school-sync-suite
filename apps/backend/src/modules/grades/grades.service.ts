@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Grade, GradeDocument } from '../../database/schemas/grade.schema';
@@ -23,58 +23,62 @@ export class GradesService {
     }
 
     const student = await this.studentsService.findByQrCode(qrCode);
-    if (student.teacher.toString() !== teacherId) {
-      throw new ForbiddenException('This student does not belong to you');
+    if (student.teacher?.toString() !== teacherId) {
+      throw new ForbiddenException('Este estudiante no está asignado a tu grupo');
     }
 
-    const assignmentQuery = Types.ObjectId.isValid(assignmentId)
-      ? { $or: [{ assignment: assignmentId }, { assignment: new Types.ObjectId(assignmentId) }] }
-      : { assignment: assignmentId };
+    const studentObjId = Types.ObjectId.isValid(student._id)
+      ? new Types.ObjectId(student._id.toString())
+      : student._id;
 
-    const studentQuery = Types.ObjectId.isValid(student._id.toString())
-      ? { $or: [{ student: student._id }, { student: student._id.toString() }] }
-      : { student: student._id };
-
-    let grade = await this.gradeModel.findOne({
-      $and: [studentQuery, assignmentQuery],
-    }).populate('student', 'name').exec();
-
-    const assignmentObjId = Types.ObjectId.isValid(assignmentId)
-      ? new Types.ObjectId(assignmentId)
-      : assignmentId;
-
-    let alreadyGraded = false;
-    if (grade) {
-      alreadyGraded = true;
-      grade.score = score;
-      grade.gradedAt = new Date();
-      grade.manualCorrection = false;
-      await grade.save();
-    } else {
-      grade = await this.gradeModel.create({
-        student: student._id,
-        assignment: assignmentObjId,
-        score,
-        gradedAt: new Date(),
-        manualCorrection: false,
-      });
-      await grade.populate('student', 'name');
+    const asgIdStr = assignment._id ? assignment._id.toString() : assignmentId;
+    if (!Types.ObjectId.isValid(asgIdStr)) {
+      throw new BadRequestException('Identificador de tarea inválido');
     }
+    const assignmentObjId = new Types.ObjectId(asgIdStr);
+
+    // Consulta previa para determinar si ya existía calificación registrada
+    const existingGrade = await this.gradeModel.findOne({
+      student: studentObjId,
+      assignment: assignmentObjId,
+    }).lean().exec();
+
+    const alreadyGraded = !!existingGrade;
+    const now = new Date();
+
+    // Actualización atómica idempotente: previene condiciones de carrera y colisiones E11000
+    const grade = await this.gradeModel.findOneAndUpdate(
+      { student: studentObjId, assignment: assignmentObjId },
+      {
+        $set: {
+          score,
+          gradedAt: now,
+          manualCorrection: false,
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    ).lean().exec();
 
     this.appGateway.sendGradeScan(teacherId, {
-      gradeId: grade._id,
-      studentId: student._id,
+      gradeId: grade._id?.toString(),
+      studentId: student._id?.toString(),
       studentName: student.name,
-      enrollmentNumber: student.enrollmentNumber,
-      assignmentId,
+      studentEnrollment: student.enrollmentNumber || '',
+      enrollmentNumber: student.enrollmentNumber || '',
+      assignmentId: asgIdStr,
       score: grade.score,
       gradedAt: grade.gradedAt,
       alreadyGraded,
     });
 
-    const gradeObj = typeof (grade as any).toObject === 'function' ? (grade as any).toObject() : grade;
     return {
-      ...gradeObj,
+      ...grade,
+      _id: grade._id?.toString(),
+      student: {
+        _id: student._id?.toString(),
+        name: student.name,
+        enrollmentNumber: student.enrollmentNumber,
+      },
       alreadyGraded,
     };
   }
@@ -100,11 +104,11 @@ export class GradesService {
         return gStudent?.toString() === studentIdStr;
       });
       return {
-        studentId: student._id,
+        studentId: student._id.toString(),
         name: student.name,
         enrollmentNumber: student.enrollmentNumber,
         qrCode: student.qrCode,
-        gradeId: grade?._id || null,
+        gradeId: grade?._id ? grade._id.toString() : null,
         score: grade !== undefined && grade !== null ? grade.score : null,
         gradedAt: grade?.gradedAt || null,
         manualCorrection: grade?.manualCorrection || false,
@@ -120,31 +124,27 @@ export class GradesService {
       throw new ForbiddenException(`Score must be between 0 and ${assignment.maxScore}`);
     }
 
-    const studentObjId = Types.ObjectId.isValid(studentId) ? new Types.ObjectId(studentId) : student._id;
-    const assignmentObjId = Types.ObjectId.isValid(assignmentId) ? new Types.ObjectId(assignmentId) : assignmentId;
+    const studentObjId = Types.ObjectId.isValid(studentId)
+      ? new Types.ObjectId(studentId)
+      : (Types.ObjectId.isValid(student._id) ? new Types.ObjectId(student._id.toString()) : student._id);
 
-    let grade = await this.gradeModel.findOne({
-      $and: [
-        { $or: [{ student: student._id }, { student: studentId }, { student: studentObjId }] },
-        { $or: [{ assignment: assignmentId }, { assignment: assignmentObjId }] }
-      ]
-    }).exec();
+    const asgIdStr = assignment._id ? assignment._id.toString() : assignmentId;
+    const assignmentObjId = Types.ObjectId.isValid(asgIdStr) ? new Types.ObjectId(asgIdStr) : assignmentId;
 
-    if (grade) {
-      grade.score = score;
-      grade.manualCorrection = true;
-      grade.gradedAt = new Date();
-      await grade.save();
-    } else {
-      grade = await this.gradeModel.create({
-        student: studentObjId,
-        assignment: assignmentObjId,
-        score,
-        gradedAt: new Date(),
-        manualCorrection: true,
-      });
-    }
+    // Actualización atómica consistente
+    const grade = await this.gradeModel.findOneAndUpdate(
+      { student: studentObjId, assignment: assignmentObjId },
+      {
+        $set: {
+          score,
+          manualCorrection: true,
+          gradedAt: new Date(),
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    ).lean().exec();
 
     return grade;
   }
 }
+

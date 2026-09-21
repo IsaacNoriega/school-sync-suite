@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { CreateSubjectDto, UpdateSubjectDto } from './dto/subject.dto';
 
 @Controller('subjects')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -14,12 +15,15 @@ export class SubjectsController {
   @Post()
   create(
     @CurrentUser() user: any,
-    @Body('name') name: string,
-    @Body('description') description?: string,
-    @Body('color') color?: string,
-    @Body('iconKey') iconKey?: string,
+    @Body() createSubjectDto: CreateSubjectDto,
   ) {
-    return this.subjectsService.create(user.teacherId, name, description, color, iconKey);
+    return this.subjectsService.create(
+      user.teacherId,
+      createSubjectDto.name,
+      createSubjectDto.description,
+      createSubjectDto.color,
+      createSubjectDto.iconKey,
+    );
   }
 
   @Get()
@@ -36,13 +40,17 @@ export class SubjectsController {
   update(
     @CurrentUser() user: any,
     @Param('id') id: string,
-    @Body('name') name?: string,
-    @Body('code') code?: string,
-    @Body('description') description?: string,
-    @Body('color') color?: string,
-    @Body('iconKey') iconKey?: string,
+    @Body() updateSubjectDto: UpdateSubjectDto,
   ) {
-    return this.subjectsService.update(user.teacherId, id, name, code, description, color, iconKey);
+    return this.subjectsService.update(
+      user.teacherId,
+      id,
+      updateSubjectDto.name,
+      updateSubjectDto.code,
+      updateSubjectDto.description,
+      updateSubjectDto.color,
+      updateSubjectDto.iconKey,
+    );
   }
 
   @Delete(':id')
@@ -50,3 +58,4 @@ export class SubjectsController {
     return this.subjectsService.remove(user.teacherId, id);
   }
 }
+
