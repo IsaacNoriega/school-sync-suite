@@ -272,8 +272,8 @@ export class StudentsService {
     const studentStringIds = studentIds.map((s) => s.toString());
     const allStudentIdsForQuery = Array.from(new Set([...studentObjectIds, ...studentStringIds]));
 
-    // 2. Ejecución paralela: asistencia diaria, rango de mes (index scan) y tareas
-    const [dailyRecords, monthlyRecords, assignments] = await Promise.all([
+    // 2. Ejecución paralela: asistencia diaria, agregación mensual y tareas
+    const [dailyRecords, monthlyAggregated, assignments] = await Promise.all([
       this.attendanceModel
         .find({
           student: { $in: allStudentIdsForQuery },
@@ -284,16 +284,23 @@ export class StudentsService {
         .lean()
         .exec(),
 
-      // B-Tree range scan en vez de regex lento para usar índices compuestos en MongoDB
-      this.attendanceModel
-        .find({
-          student: { $in: allStudentIdsForQuery },
-          date: { $gte: startOfMonth, $lte: endOfMonth },
-          status: { $in: ['PRESENT', 'LATE'] },
-        })
-        .select('student date status')
-        .lean()
-        .exec(),
+      // Pipeline de agregación optimizado con Covered Index { student: 1, date: 1, status: 1 }
+      // MongoDB agrupa y cuenta en el motor de base de datos sin transferir documentos masivos a la memoria de Node.js
+      this.attendanceModel.aggregate<{ _id: Types.ObjectId | string; attendedDaysCount: number }>([
+        {
+          $match: {
+            student: { $in: allStudentIdsForQuery },
+            date: { $gte: startOfMonth, $lte: endOfMonth },
+            status: { $in: ['PRESENT', 'LATE'] },
+          },
+        },
+        {
+          $group: {
+            _id: '$student',
+            attendedDaysCount: { $sum: 1 },
+          },
+        },
+      ]),
 
       this.assignmentModel
         .find({
@@ -338,14 +345,11 @@ export class StudentsService {
     }
 
     const monthlyCountMap = new Map<string, number>();
-    const distinctDates = new Set<string>();
-    for (const r of monthlyRecords) {
-      const sId = r.student.toString();
-      monthlyCountMap.set(sId, (monthlyCountMap.get(sId) || 0) + 1);
-      if (r.date) {
-        distinctDates.add(r.date);
-      }
+    for (const record of monthlyAggregated) {
+      const sId = record._id.toString();
+      monthlyCountMap.set(sId, record.attendedDaysCount);
     }
+
 
     const studentScoreTotals = new Map<string, { totalPercent: number; validCount: number }>();
     for (const g of grades) {
@@ -358,8 +362,6 @@ export class StudentsService {
         studentScoreTotals.set(sId, item);
       }
     }
-
-    const activeDaysCount = Math.max(1, distinctDates.size);
 
     // 5. Mapeo final en una sola pasada lineal O(N)
     return students.map((student) => {

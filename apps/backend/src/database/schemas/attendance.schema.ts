@@ -32,3 +32,10 @@ AttendanceSchema.index({ student: 1, date: 1 }, { unique: true });
 // 2. Índice para consultas y reportes agregados por fecha
 AttendanceSchema.index({ date: 1 });
 
+// 3. Índice Compuesto de Cobertura para Agregaciones Mensuales del Dashboard:
+// Cubre el pipeline $match { student: $in, date: { $gte, $lte }, status: $in } y $group { _id: '$student' }
+// Al contener (student, date, status), MongoDB resuelve la agregación al 100% en el índice B-Tree (Covered Query)
+// sin cargar documentos planos de disco (totalDocsExamined: 0).
+AttendanceSchema.index({ student: 1, date: 1, status: 1 });
+
+
