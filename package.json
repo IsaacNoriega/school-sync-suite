@@ -13,7 +13,10 @@
     "build": "pnpm build:shared && pnpm build:backend && pnpm build:frontend",
     "start:backend": "pnpm --filter backend start:prod",
     "start:frontend": "pnpm --filter frontend start",
-    "install:all": "pnpm install"
+    "install:all": "pnpm install",
+    "test": "pnpm --filter backend test",
+    "test:backend": "pnpm --filter backend test",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
     "typescript": "^5.0.0"
