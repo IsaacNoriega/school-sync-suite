@@ -41,19 +41,25 @@ export default function ScannerClientView() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Mode: 'grades' or 'attendance'
+  // Mode: 'grades' or 'attendance', subjectId, assignmentId, maxScore
   const initialMode = searchParams.get('mode') === 'grades' ? 'grades' : 'attendance';
+  const initialSubjectId = searchParams.get('subjectId') || '';
   const initialAssignmentId = searchParams.get('assignmentId') || '';
+  const initialMaxScore = searchParams.get('maxScore') ? Number(searchParams.get('maxScore')) : null;
+
+  const urlParamsConsumedRef = useRef(false);
 
   const [scanMode, setScanMode] = useState<ScanMode>(initialMode);
   const [inputSource, setInputSource] = useState<InputSource>('camera');
-  const [gradingScore, setGradingScore] = useState<number>(100);
+  const [gradingScore, setGradingScore] = useState<number>(
+    initialMaxScore && !isNaN(initialMaxScore) ? initialMaxScore : 100
+  );
   const [isTorchOn, setIsTorchOn] = useState(false);
   const [activeCameraId, setActiveCameraId] = useState<'environment' | 'user'>('environment');
 
   // Real database subjects & assignments
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(initialSubjectId);
   const [assignments, setAssignments] = useState<AssignmentOption[]>([]);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>(initialAssignmentId);
   const [totalStudents, setTotalStudents] = useState<number>(36);
@@ -236,13 +242,18 @@ export default function ScannerClientView() {
         const data: SubjectOption[] = await res.json();
         setSubjects(data);
         if (data.length > 0) {
-          setSelectedSubjectId((prev) => prev || data[0]._id);
+          setSelectedSubjectId((prev) => {
+            if (initialSubjectId && data.some((s) => s._id === initialSubjectId)) {
+              return initialSubjectId;
+            }
+            return prev || data[0]._id;
+          });
         }
       }
     } catch (err) {
       console.error('Error fetching subjects:', err);
     }
-  }, []);
+  }, [initialSubjectId]);
 
   // Fetch Assignments for subject
   const fetchAssignments = useCallback(async (rawSubjectId: any) => {
@@ -269,10 +280,21 @@ export default function ScannerClientView() {
         const data: AssignmentOption[] = await res.json();
         setAssignments(data);
         if (data.length > 0) {
-          if (initialAssignmentId && data.some(a => a._id === initialAssignmentId)) {
-            setSelectedAssignmentId(initialAssignmentId);
-          } else {
-            setSelectedAssignmentId(data[0]._id);
+          const targetAsgId =
+            !urlParamsConsumedRef.current &&
+            initialAssignmentId &&
+            data.some((a) => a._id === initialAssignmentId)
+              ? initialAssignmentId
+              : data[0]._id;
+
+          setSelectedAssignmentId(targetAsgId);
+          urlParamsConsumedRef.current = true;
+
+          const activeAsg = data.find((a) => a._id === targetAsgId);
+          if (activeAsg && typeof activeAsg.maxScore === 'number') {
+            setGradingScore(activeAsg.maxScore);
+          } else if (initialMaxScore && !isNaN(initialMaxScore)) {
+            setGradingScore(initialMaxScore);
           }
         } else {
           setSelectedAssignmentId('');
@@ -283,7 +305,7 @@ export default function ScannerClientView() {
     } catch (err) {
       console.error('Error fetching assignments:', err);
     }
-  }, [initialAssignmentId, router]);
+  }, [initialAssignmentId, initialMaxScore, router]);
 
   // Fetch Grades for assignment
   const fetchGradesForAssignment = useCallback(async (assignmentId: string) => {
@@ -406,6 +428,14 @@ export default function ScannerClientView() {
       setLoadingAttendance(false);
     }
   }, []);
+
+  const handleAssignmentChange = useCallback((newAsgId: string) => {
+    setSelectedAssignmentId(newAsgId);
+    const found = assignments.find((a) => a._id === newAsgId);
+    if (found && typeof found.maxScore === 'number') {
+      setGradingScore(found.maxScore);
+    }
+  }, [assignments]);
 
   useEffect(() => {
     fetchStudents();
@@ -1001,7 +1031,7 @@ export default function ScannerClientView() {
             onSubjectChange={setSelectedSubjectId}
             assignments={assignments}
             selectedAssignmentId={selectedAssignmentId}
-            onAssignmentChange={setSelectedAssignmentId}
+            onAssignmentChange={handleAssignmentChange}
             gradingScore={gradingScore}
             onGradingScoreChange={setGradingScore}
           />

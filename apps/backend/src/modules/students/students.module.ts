@@ -7,6 +7,7 @@ import { Attendance, AttendanceSchema } from '../../database/schemas/attendance.
 import { Grade, GradeSchema } from '../../database/schemas/grade.schema';
 import { Assignment, AssignmentSchema } from '../../database/schemas/assignment.schema';
 import { Subject, SubjectSchema } from '../../database/schemas/subject.schema';
+import { Teacher, TeacherSchema } from '../../database/schemas/teacher.schema';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { Subject, SubjectSchema } from '../../database/schemas/subject.schema';
       { name: Grade.name, schema: GradeSchema },
       { name: Assignment.name, schema: AssignmentSchema },
       { name: Subject.name, schema: SubjectSchema },
+      { name: Teacher.name, schema: TeacherSchema },
     ]),
   ],
   controllers: [StudentsController],

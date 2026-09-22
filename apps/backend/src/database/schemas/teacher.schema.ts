@@ -23,6 +23,9 @@ export class Teacher extends Document {
 
   @Prop({ default: 'Matutino' })
   shift: string;
+
+  @Prop({ default: 0 })
+  studentSequence: number;
 }
 
 export const TeacherSchema = SchemaFactory.createForClass(Teacher);

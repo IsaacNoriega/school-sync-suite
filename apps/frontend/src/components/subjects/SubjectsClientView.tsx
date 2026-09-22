@@ -449,8 +449,10 @@ export default function SubjectsClientView() {
       throw new Error(errData.message || 'Error al crear la tarea');
     }
 
+    const created = await res.json().catch(() => null);
     await fetchAssignments(selectedSubject);
     await fetchSubjects();
+    return created;
   };
 
   // Handle Edit Assignment
@@ -512,6 +514,14 @@ export default function SubjectsClientView() {
       toast.error(err.message || 'No se pudo eliminar la tarea');
       setDeleteConfirmation((prev) => ({ ...prev, loading: false }));
     }
+  };
+
+  const handleScanTask = (task: AssignmentItem) => {
+    const subId = typeof task.subject === 'object' && task.subject !== null
+      ? task.subject._id
+      : (task.subject || selectedSubject);
+    const maxScore = task.maxScore || 100;
+    router.push(`/scanner?mode=grades&subjectId=${subId}&assignmentId=${task._id}&maxScore=${maxScore}`);
   };
 
   const [isExportingExcel, setIsExportingExcel] = useState(false);
@@ -995,7 +1005,7 @@ export default function SubjectsClientView() {
                         <Button
                           variant="primary"
                           leftIcon={<QrCode size={16} />}
-                          onClick={() => router.push(`/scanner?mode=grades&assignmentId=${task._id}`)}
+                          onClick={() => handleScanTask(task)}
                           className="bg-[#0284c7] hover:bg-[#0369a1] text-white px-4 py-2 text-xs font-black shadow-sm"
                         >
                           Escanear QR
@@ -1006,7 +1016,7 @@ export default function SubjectsClientView() {
                         <Button
                           variant="warning"
                           leftIcon={<QrCode size={16} />}
-                          onClick={() => router.push(`/scanner?mode=grades&assignmentId=${task._id}`)}
+                          onClick={() => handleScanTask(task)}
                           className="bg-[#f59e0b] hover:bg-[#d97706] text-white px-4 py-2 text-xs font-black shadow-sm"
                         >
                           Escanear QR
@@ -1028,7 +1038,7 @@ export default function SubjectsClientView() {
                         <Button
                           variant="danger"
                           leftIcon={<ScanLine size={16} />}
-                          onClick={() => router.push(`/scanner?mode=grades&assignmentId=${task._id}`)}
+                          onClick={() => handleScanTask(task)}
                           className="bg-[#f43f5e] hover:bg-[#e11d48] text-white px-4 py-2 text-xs font-black shadow-sm"
                         >
                           Escanear

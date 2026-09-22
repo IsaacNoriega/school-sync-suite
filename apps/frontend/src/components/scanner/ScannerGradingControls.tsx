@@ -24,6 +24,9 @@ export const ScannerGradingControls: React.FC<ScannerGradingControlsProps> = ({
   gradingScore,
   onGradingScoreChange,
 }) => {
+  const activeAssignment = assignments.find((a) => a._id === selectedAssignmentId);
+  const currentMaxScore = activeAssignment?.maxScore || 100;
+
   return (
     <div className="max-w-4xl mx-auto bg-[#e6f4fe] border border-sky-100/90 rounded-3xl p-4 sm:p-5 shadow-2xs">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
@@ -57,7 +60,7 @@ export const ScannerGradingControls: React.FC<ScannerGradingControlsProps> = ({
             >
               {assignments.map((asg) => (
                 <option key={asg._id} value={asg._id}>
-                  {asg.title}
+                  {asg.title} {asg.maxScore ? `(${asg.maxScore} pts)` : ''}
                 </option>
               ))}
             </select>
@@ -67,13 +70,25 @@ export const ScannerGradingControls: React.FC<ScannerGradingControlsProps> = ({
 
         {/* Puntos a Asignar */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold text-[#0284c7] pl-1">Puntos a Asignar:</label>
+          <div className="flex items-center justify-between pl-1">
+            <label className="text-xs font-bold text-[#0284c7]">Puntos a Asignar:</label>
+            <span className="text-[10px] font-black text-sky-700 bg-sky-100/90 px-2 py-0.5 rounded-lg border border-sky-200/50">
+              Máx: {currentMaxScore} pts
+            </span>
+          </div>
           <Input
             type="number"
             min={0}
-            max={100}
+            max={currentMaxScore}
             value={gradingScore}
-            onChange={(e) => onGradingScoreChange(parseFloat(e.target.value) || 0)}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              if (isNaN(val)) {
+                onGradingScoreChange(0);
+              } else {
+                onGradingScoreChange(Math.min(currentMaxScore, Math.max(0, val)));
+              }
+            }}
             className="text-center font-black text-lg text-[#0284c7] bg-white border border-slate-200/80 rounded-2xl py-1 shadow-xs"
           />
         </div>

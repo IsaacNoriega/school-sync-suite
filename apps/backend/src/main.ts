@@ -1,8 +1,8 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-import { NestFactory, Reflector } from '@nestjs/core';
-import { ValidationPipe, ClassSerializerInterceptor, Logger } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import helmet from 'helmet';
 import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
@@ -68,9 +68,7 @@ async function bootstrap() {
     }),
   );
 
-  // 6. Seguridad: Prevención de fuga de campos sensibles en respuestas
-  const reflector = app.get(Reflector);
-  app.useGlobalInterceptors(new ClassSerializerInterceptor(reflector));
+  // 6. Seguridad: Prevención de fuga de campos sensibles (sin ClassSerializerInterceptor global para preservar ObjectIds de Mongoose)
 
   // 7. Resiliencia: Filtro global de excepciones sanitizado con Trace ID
   app.useGlobalFilters(new GlobalExceptionFilter());

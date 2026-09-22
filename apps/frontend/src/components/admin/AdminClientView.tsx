@@ -129,11 +129,12 @@ export default function AdminClientView() {
                 .toUpperCase()
             : 'DC';
 
-          const shortId = t._id ? t._id.slice(-4).toUpperCase() : `00${idx + 1}`;
+          const rawId = typeof t._id === 'string' ? t._id : (t._id ? String(t._id) : (t.id ? String(t.id) : ''));
+          const shortId = rawId && rawId.length >= 4 ? rawId.slice(-4).toUpperCase() : `00${idx + 1}`;
 
           return {
-            id: t._id,
-            userId: t.user?._id || '',
+            id: rawId || `teacher-${idx}`,
+            userId: typeof t.user?._id === 'string' ? t.user._id : (t.user?._id ? String(t.user._id) : (t.user?.id ? String(t.user.id) : '')),
             name: t.name || 'Docente',
             email: t.user?.email || 'Sin correo',
             schoolName: t.schoolName || 'Sin institución asignada',

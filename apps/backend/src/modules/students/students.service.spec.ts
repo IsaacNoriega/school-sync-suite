@@ -7,6 +7,7 @@ import { Attendance } from '../../database/schemas/attendance.schema';
 import { Grade } from '../../database/schemas/grade.schema';
 import { Assignment } from '../../database/schemas/assignment.schema';
 import { Subject } from '../../database/schemas/subject.schema';
+import { Teacher } from '../../database/schemas/teacher.schema';
 
 describe('StudentsService (Unit)', () => {
   let service: StudentsService;
@@ -15,6 +16,7 @@ describe('StudentsService (Unit)', () => {
   let mockGradeModel: any;
   let mockAssignmentModel: any;
   let mockSubjectModel: any;
+  let mockTeacherModel: any;
 
   const mockTeacherId = new Types.ObjectId().toString();
   const mockStudentId = new Types.ObjectId();
@@ -25,6 +27,7 @@ describe('StudentsService (Unit)', () => {
       findOne: jest.fn(),
       findById: jest.fn(),
       create: jest.fn(),
+      countDocuments: jest.fn(),
     };
 
     mockAttendanceModel = {
@@ -46,6 +49,10 @@ describe('StudentsService (Unit)', () => {
       find: jest.fn(),
     };
 
+    mockTeacherModel = {
+      findByIdAndUpdate: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StudentsService,
@@ -54,6 +61,7 @@ describe('StudentsService (Unit)', () => {
         { provide: getModelToken(Grade.name), useValue: mockGradeModel },
         { provide: getModelToken(Assignment.name), useValue: mockAssignmentModel },
         { provide: getModelToken(Subject.name), useValue: mockSubjectModel },
+        { provide: getModelToken(Teacher.name), useValue: mockTeacherModel },
       ],
     }).compile();
 
@@ -168,6 +176,92 @@ describe('StudentsService (Unit)', () => {
       expect(metrics[0].daysInMonth).toBe(30);
       expect(metrics[0].attendanceRatio).toBe('15 / 30');
       expect(metrics[0].homeworkScore).toBe(90); // (9 / 10) * 100
+    });
+  });
+
+  describe('create', () => {
+    it('debe autogenerar la matrícula atómicamente si no se proporciona', async () => {
+      const teacherObjId = new Types.ObjectId();
+      const teacherDoc = {
+        _id: teacherObjId,
+        name: 'Profesor Carlos',
+        studentSequence: 5,
+      };
+
+      mockTeacherModel.findByIdAndUpdate.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue(teacherDoc),
+        }),
+      });
+
+      // Simular que no hay colisión previa
+      mockStudentModel.findOne.mockReturnValue({
+        lean: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue(null),
+        }),
+      });
+
+      const mockCreatedStudent = {
+        _id: new Types.ObjectId(),
+        teacher: teacherObjId.toString(),
+        name: 'Lucas Alarcón',
+        enrollmentNumber: `EQR-${teacherObjId.toString().slice(-4).toUpperCase()}-0005`,
+        qrCode: 'STUDENT-QR-TEST',
+        toObject: jest.fn().mockReturnValue({
+          _id: 'mock-id',
+          name: 'Lucas Alarcón',
+          enrollmentNumber: `EQR-${teacherObjId.toString().slice(-4).toUpperCase()}-0005`,
+        }),
+      };
+
+      mockStudentModel.create.mockResolvedValue(mockCreatedStudent);
+
+      const result = await service.create(teacherObjId.toString(), 'Lucas Alarcón');
+
+      expect(mockTeacherModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        expect.any(Types.ObjectId),
+        { $inc: { studentSequence: 1 } },
+        { new: true, upsert: false }
+      );
+
+      const expectedCode = teacherObjId.toString().slice(-4).toUpperCase();
+      expect(mockStudentModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'Lucas Alarcón',
+          enrollmentNumber: `EQR-${expectedCode}-0005`,
+        })
+      );
+      expect(result.enrollmentNumber).toBe(`EQR-${expectedCode}-0005`);
+    });
+
+    it('debe respetar la matrícula manual si se proporciona explícitamente y no colisiona', async () => {
+      mockStudentModel.findOne.mockReturnValue({
+        lean: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue(null),
+        }),
+      });
+
+      mockStudentModel.create.mockResolvedValue({
+        _id: new Types.ObjectId(),
+        name: 'Mateo Benítez',
+        enrollmentNumber: 'MAT-999',
+        toObject: jest.fn().mockReturnValue({
+          name: 'Mateo Benítez',
+          enrollmentNumber: 'MAT-999',
+        }),
+      });
+
+      const result = await service.create(mockTeacherId, 'Mateo Benítez', 'MAT-999');
+
+      expect(mockTeacherModel.findByIdAndUpdate).not.toHaveBeenCalled();
+      expect(mockStudentModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'Mateo Benítez',
+          enrollmentNumber: 'MAT-999',
+        })
+      );
+      expect(result.enrollmentNumber).toBe('MAT-999');
     });
   });
 });
