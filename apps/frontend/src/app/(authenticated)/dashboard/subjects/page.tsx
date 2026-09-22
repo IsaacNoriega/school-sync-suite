@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: 'Vista general y gestión de asignaturas escolares.',
 };
 
-export default function SubjectsPage() {
+export default function DashboardSubjectsPage() {
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 pb-20 select-none font-sans">
       {/* Header de Navegación Principal */}
@@ -15,7 +15,7 @@ export default function SubjectsPage() {
 
       {/* Nivel 1: Cuadrícula interactiva de materias */}
       <main>
-        <SubjectsGridView basePath="/subjects" />
+        <SubjectsGridView basePath="/dashboard/subjects" />
       </main>
     </div>
   );

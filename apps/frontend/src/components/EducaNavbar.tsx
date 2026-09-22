@@ -140,7 +140,7 @@ export const EducaNavbar: React.FC<EducaNavbarProps> = ({
 
   return (
     <>
-      <header className="w-full bg-white/95 backdrop-blur-md sticky top-0 z-50 px-6 py-3 shadow-[0_4px_25px_rgba(0,0,0,0.03)] select-none">
+      <header className="w-full bg-white/95 backdrop-blur-md sticky top-0 z-50 px-6 py-3 shadow-[0_4px_25px_rgba(0,0,0,0.03)] select-none print:hidden">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           {/* ========================================================
               1. MARCA CON SÍMBOLOS LÚDICOS (+, -, ×, ÷) Y NOMBRE

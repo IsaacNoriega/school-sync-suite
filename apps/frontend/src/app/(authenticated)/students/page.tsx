@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function StudentsPage() {
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 pb-20 select-none font-sans">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900 pb-20 select-none font-sans print:bg-white print:p-0 print:m-0 print:pb-0">
       {/* 1. Header de Navegación Principal */}
       <EducaNavbar activeTab="students" />
 
