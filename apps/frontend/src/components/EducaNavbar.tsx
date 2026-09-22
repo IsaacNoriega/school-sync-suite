@@ -83,6 +83,40 @@ export const EducaNavbar: React.FC<EducaNavbarProps> = ({
   const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
 
   // Definición de las rutas según el rol
+  const teacherNavItems: NavigationItem[] = [
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      tooltip: 'Resumen del día, alertas y accesos rápidos',
+      path: '/dashboard',
+    },
+    {
+      id: 'scanner',
+      label: 'Escáner QR',
+      isSpecial: true, // "Joya de la corona"
+      tooltip: 'Pase de lista y calificación continua',
+      path: '/scanner',
+    },
+    {
+      id: 'attendance',
+      label: 'Historial Asistencia',
+      tooltip: 'Historial diario y reportes mensuales con exportación a Excel',
+      path: '/attendance',
+    },
+    {
+      id: 'students',
+      label: 'Registrar Alumnos',
+      tooltip: 'Registro, credenciales y gafetes QR',
+      path: '/students',
+    },
+    {
+      id: 'subjects',
+      label: 'Materias y Tareas',
+      tooltip: 'Carpetas de colores, asignaciones y puntajes',
+      path: '/subjects',
+    },
+  ];
+
   const navigationItems: NavigationItem[] = isSuperAdmin
     ? [
         {
@@ -91,40 +125,9 @@ export const EducaNavbar: React.FC<EducaNavbarProps> = ({
           tooltip: 'Panel de administración escolar y gestión de maestros',
           path: '/admin',
         },
+        ...teacherNavItems,
       ]
-    : [
-        {
-          id: 'dashboard',
-          label: 'Dashboard',
-          tooltip: 'Resumen del día, alertas y accesos rápidos',
-          path: '/dashboard',
-        },
-        {
-          id: 'scanner',
-          label: 'Escáner QR',
-          isSpecial: true, // "Joya de la corona"
-          tooltip: 'Pase de lista y calificación continua',
-          path: '/scanner',
-        },
-        {
-          id: 'attendance',
-          label: 'Historial Asistencia',
-          tooltip: 'Historial diario y reportes mensuales con exportación a Excel',
-          path: '/attendance',
-        },
-        {
-          id: 'students',
-          label: 'Registrar Alumnos',
-          tooltip: 'Registro, credenciales y gafetes QR',
-          path: '/students',
-        },
-        {
-          id: 'subjects',
-          label: 'Materias y Tareas',
-          tooltip: 'Carpetas de colores, asignaciones y puntajes',
-          path: '/subjects',
-        },
-      ];
+    : teacherNavItems;
 
   const handleLogoutClick = () => {
     setIsUserMenuOpen(false);

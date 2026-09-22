@@ -55,7 +55,7 @@ export class AuthService {
     const payload = { sub: user._id, role: user.role, email: user.email };
     
     let teacherDetails = null;
-    if (user.role === 'TEACHER') {
+    if (user.role === 'TEACHER' || user.role === 'SUPER_ADMIN') {
       const teacher = await this.teacherModel.findOne({ user: user._id }).lean().exec();
       if (teacher) {
         teacherDetails = {
@@ -212,7 +212,7 @@ export class AuthService {
     }
 
     let teacherDetails = null;
-    if (user.role === 'TEACHER') {
+    if (user.role === 'TEACHER' || user.role === 'SUPER_ADMIN') {
       const teacher = await this.teacherModel.findOne({ user: user._id }).lean().exec();
       if (teacher) {
         teacherDetails = {
@@ -242,7 +242,7 @@ export class AuthService {
     }
 
     let teacherDetails = null;
-    if (user.role === 'TEACHER') {
+    if (user.role === 'TEACHER' || user.role === 'SUPER_ADMIN') {
       const teacher = await this.teacherModel.findOne({ user: user._id }).exec();
       if (teacher) {
         if (updateDto.name && updateDto.name.trim()) teacher.name = updateDto.name.trim();
