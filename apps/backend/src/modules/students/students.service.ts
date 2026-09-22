@@ -6,6 +6,7 @@ import { Attendance } from '../../database/schemas/attendance.schema';
 import { Grade } from '../../database/schemas/grade.schema';
 import { Assignment } from '../../database/schemas/assignment.schema';
 import { Subject } from '../../database/schemas/subject.schema';
+import { Teacher } from '../../database/schemas/teacher.schema';
 
 @Injectable()
 export class StudentsService {
@@ -15,6 +16,7 @@ export class StudentsService {
     @InjectModel(Grade.name) private gradeModel: Model<Grade>,
     @InjectModel(Assignment.name) private assignmentModel: Model<Assignment>,
     @InjectModel(Subject.name) private subjectModel: Model<Subject>,
+    @InjectModel(Teacher.name) private teacherModel: Model<Teacher>,
   ) {}
 
   async create(
@@ -27,27 +29,68 @@ export class StudentsService {
     tutorPhone?: string,
     status?: string,
   ) {
-    if (enrollmentNumber) {
-      const existing = await this.studentModel.findOne({ enrollmentNumber }).lean().exec();
+    let finalEnrollment = enrollmentNumber?.trim();
+
+    if (finalEnrollment) {
+      const existing = await this.studentModel.findOne({ enrollmentNumber: finalEnrollment }).lean().exec();
       if (existing) {
         throw new ConflictException('La matrícula ya está registrada para otro alumno.');
+      }
+    } else {
+      // 1. Generación atómica y eficiente basada en el docente: EQR-{TEACHER_CODE}-{SEQ}
+      const teacherObjId = Types.ObjectId.isValid(teacherId)
+        ? new Types.ObjectId(teacherId)
+        : teacherId;
+
+      // Incrementar atómicamente la secuencia de alumnos del docente con $inc
+      const teacherDoc = await this.teacherModel.findByIdAndUpdate(
+        teacherObjId,
+        { $inc: { studentSequence: 1 } },
+        { new: true, upsert: false },
+      ).select('_id name schoolName studentSequence').lean().exec();
+
+      let seq = 1;
+      let teacherCode = 'DOC';
+
+      if (teacherDoc) {
+        seq = teacherDoc.studentSequence || 1;
+        teacherCode = teacherDoc._id.toString().slice(-4).toUpperCase();
+      } else {
+        // Fallback seguro si teacherId no corresponde a un documento de Teacher directo
+        const count = await this.studentModel.countDocuments({ teacher: teacherObjId }).exec();
+        seq = count + 1;
+        teacherCode = typeof teacherId === 'string' && teacherId.length >= 4
+          ? teacherId.slice(-4).toUpperCase()
+          : '0000';
+      }
+
+      const seqStr = String(seq).padStart(4, '0');
+      finalEnrollment = `EQR-${teacherCode}-${seqStr}`;
+
+      // Verificar que no colisione con registros preexistentes manuales
+      let attempt = 0;
+      while (await this.studentModel.findOne({ enrollmentNumber: finalEnrollment }).lean().exec()) {
+        attempt++;
+        const fallbackSeq = String(seq + attempt).padStart(4, '0');
+        finalEnrollment = `EQR-${teacherCode}-${fallbackSeq}`;
       }
     }
 
     const suffix = Math.random().toString(36).substring(2, 7).toUpperCase();
     const qrCode = `STUDENT-${teacherId.substring(18, 24).toUpperCase()}-${Date.now().toString(36).toUpperCase()}-${suffix}`;
 
-    return this.studentModel.create({
+    const doc = await this.studentModel.create({
       teacher: teacherId,
       name,
       qrCode,
-      enrollmentNumber,
+      enrollmentNumber: finalEnrollment,
       group: group || '3° B',
       shift: shift || 'Matutino',
       tutor: tutor || 'Tutor Registrado',
       tutorPhone: tutorPhone || '',
       status: status || 'EMITTED',
     });
+    return doc.toObject ? doc.toObject() : doc;
   }
 
   async findAll(teacherId?: string, projection?: any) {
@@ -135,7 +178,7 @@ export class StudentsService {
       id,
       updateFields,
       { new: true },
-    ).exec();
+    ).lean().exec();
   }
 
   async remove(teacherId: string, id: string) {
@@ -272,8 +315,8 @@ export class StudentsService {
     const studentStringIds = studentIds.map((s) => s.toString());
     const allStudentIdsForQuery = Array.from(new Set([...studentObjectIds, ...studentStringIds]));
 
-    // 2. Ejecución paralela: asistencia diaria, rango de mes (index scan) y tareas
-    const [dailyRecords, monthlyRecords, assignments] = await Promise.all([
+    // 2. Ejecución paralela: asistencia diaria, agregación mensual y tareas
+    const [dailyRecords, monthlyAggregated, assignments] = await Promise.all([
       this.attendanceModel
         .find({
           student: { $in: allStudentIdsForQuery },
@@ -284,16 +327,23 @@ export class StudentsService {
         .lean()
         .exec(),
 
-      // B-Tree range scan en vez de regex lento para usar índices compuestos en MongoDB
-      this.attendanceModel
-        .find({
-          student: { $in: allStudentIdsForQuery },
-          date: { $gte: startOfMonth, $lte: endOfMonth },
-          status: { $in: ['PRESENT', 'LATE'] },
-        })
-        .select('student date status')
-        .lean()
-        .exec(),
+      // Pipeline de agregación optimizado con Covered Index { student: 1, date: 1, status: 1 }
+      // MongoDB agrupa y cuenta en el motor de base de datos sin transferir documentos masivos a la memoria de Node.js
+      this.attendanceModel.aggregate<{ _id: Types.ObjectId | string; attendedDaysCount: number }>([
+        {
+          $match: {
+            student: { $in: allStudentIdsForQuery },
+            date: { $gte: startOfMonth, $lte: endOfMonth },
+            status: { $in: ['PRESENT', 'LATE'] },
+          },
+        },
+        {
+          $group: {
+            _id: '$student',
+            attendedDaysCount: { $sum: 1 },
+          },
+        },
+      ]),
 
       this.assignmentModel
         .find({
@@ -338,14 +388,11 @@ export class StudentsService {
     }
 
     const monthlyCountMap = new Map<string, number>();
-    const distinctDates = new Set<string>();
-    for (const r of monthlyRecords) {
-      const sId = r.student.toString();
-      monthlyCountMap.set(sId, (monthlyCountMap.get(sId) || 0) + 1);
-      if (r.date) {
-        distinctDates.add(r.date);
-      }
+    for (const record of monthlyAggregated) {
+      const sId = record._id.toString();
+      monthlyCountMap.set(sId, record.attendedDaysCount);
     }
+
 
     const studentScoreTotals = new Map<string, { totalPercent: number; validCount: number }>();
     for (const g of grades) {
@@ -358,8 +405,6 @@ export class StudentsService {
         studentScoreTotals.set(sId, item);
       }
     }
-
-    const activeDaysCount = Math.max(1, distinctDates.size);
 
     // 5. Mapeo final en una sola pasada lineal O(N)
     return students.map((student) => {
@@ -377,7 +422,7 @@ export class StudentsService {
           : 0;
 
       return {
-        studentId: student._id,
+        studentId: student._id.toString(),
         name: student.name,
         enrollmentNumber: student.enrollmentNumber || '',
         qrCode: student.qrCode || '',
@@ -386,7 +431,7 @@ export class StudentsService {
         group: student.group || '3° B',
         shift: student.shift || 'Matutino',
         badgeStatus: student.status || 'EMITTED',
-        attendanceId: dailyRecord?._id || null,
+        attendanceId: dailyRecord?._id ? dailyRecord._id.toString() : null,
         status,
         scannedAt: dailyRecord?.scannedAt || null,
         attendedDaysCount,

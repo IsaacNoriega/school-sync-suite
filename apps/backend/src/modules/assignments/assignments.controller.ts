@@ -4,8 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import * as fs from 'fs';
-import * as path from 'path';
+import { CreateAssignmentDto, UpdateAssignmentDto } from './dto/assignment.dto';
 
 @Controller('assignments')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -16,52 +15,26 @@ export class AssignmentsController {
   @Post()
   create(
     @CurrentUser() user: any,
-    @Body('subjectId') subjectId: string,
-    @Body('title') title: string,
-    @Body('description') description?: string,
-    @Body('maxScore') maxScore?: number,
-    @Body('dueDate') dueDate?: string,
-    @Body('code') code?: string,
-    @Body('color') color?: string,
-    @Body('iconKey') iconKey?: string,
+    @Body() createAssignmentDto: CreateAssignmentDto,
   ) {
     let parsedDate: Date | undefined = undefined;
-    if (dueDate && typeof dueDate === 'string' && dueDate.trim() !== '') {
-      const d = new Date(dueDate);
+    if (createAssignmentDto.dueDate && typeof createAssignmentDto.dueDate === 'string' && createAssignmentDto.dueDate.trim() !== '') {
+      const d = new Date(createAssignmentDto.dueDate);
       if (!isNaN(d.getTime())) {
         parsedDate = d;
       }
     }
-    return this.assignmentsService.create(user.teacherId, subjectId, title, description, maxScore, parsedDate, code, color, iconKey);
-  }
-
-  @Post(':id/export')
-  exportToLocalDisk(
-    @Param('id') id: string,
-    @Body('subjectName') subjectName: string,
-    @Body('assignmentTitle') assignmentTitle: string,
-    @Body('csvContent') csvContent: string,
-  ) {
-    const safeSubjectName = subjectName.replace(/[^a-zA-Z0-9_áéíóúÁÉÍÓÚñÑ\- ]/g, '_');
-    const safeAssignmentTitle = assignmentTitle.replace(/[^a-zA-Z0-9_áéíóúÁÉÍÓÚñÑ\- ]/g, '_');
-    
-    const os = require('os');
-    const exportsDir = path.resolve(os.tmpdir(), 'educaqr_exports', safeSubjectName);
-    
-    if (!fs.existsSync(exportsDir)) {
-      fs.mkdirSync(exportsDir, { recursive: true });
-    }
-    
-    const filePath = path.resolve(exportsDir, `${safeAssignmentTitle}.csv`);
-    
-    // Path traversal mitigation
-    if (!filePath.startsWith(exportsDir)) {
-      throw new Error('Invalid file path');
-    }
-    
-    fs.writeFileSync(filePath, csvContent, 'utf8');
-    
-    return { success: true, path: filePath };
+    return this.assignmentsService.create(
+      user.teacherId,
+      createAssignmentDto.subjectId,
+      createAssignmentDto.title,
+      createAssignmentDto.description,
+      createAssignmentDto.maxScore,
+      parsedDate,
+      createAssignmentDto.code,
+      createAssignmentDto.color,
+      createAssignmentDto.iconKey,
+    );
   }
 
   @Get()
@@ -81,21 +54,25 @@ export class AssignmentsController {
   update(
     @CurrentUser() user: any,
     @Param('id') id: string,
-    @Body('title') title?: string,
-    @Body('description') description?: string,
-    @Body('maxScore') maxScore?: number,
-    @Body('dueDate') dueDate?: string,
-    @Body('color') color?: string,
-    @Body('iconKey') iconKey?: string,
+    @Body() updateAssignmentDto: UpdateAssignmentDto,
   ) {
     let parsedDate: Date | undefined = undefined;
-    if (dueDate && typeof dueDate === 'string' && dueDate.trim() !== '') {
-      const d = new Date(dueDate);
+    if (updateAssignmentDto.dueDate && typeof updateAssignmentDto.dueDate === 'string' && updateAssignmentDto.dueDate.trim() !== '') {
+      const d = new Date(updateAssignmentDto.dueDate);
       if (!isNaN(d.getTime())) {
         parsedDate = d;
       }
     }
-    return this.assignmentsService.update(user.teacherId, id, title, description, maxScore, parsedDate, color, iconKey);
+    return this.assignmentsService.update(
+      user.teacherId,
+      id,
+      updateAssignmentDto.title,
+      updateAssignmentDto.description,
+      updateAssignmentDto.maxScore,
+      parsedDate,
+      updateAssignmentDto.color,
+      updateAssignmentDto.iconKey,
+    );
   }
 
   @Delete(':id')
@@ -103,3 +80,4 @@ export class AssignmentsController {
     return this.assignmentsService.remove(user.teacherId, id);
   }
 }
+

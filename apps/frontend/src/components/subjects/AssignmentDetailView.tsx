@@ -308,6 +308,15 @@ export default function AssignmentDetailView({ assignment, onBack }: AssignmentD
 
   const subjectName = assignment.subject?.name || 'Matemáticas III';
 
+  const handleScanAssignment = () => {
+    const subId = typeof assignment.subject === 'object' && assignment.subject !== null
+      ? (assignment.subject as any)._id
+      : String(assignment.subject || '');
+    const maxScore = assignment.maxScore || 10;
+    const url = `/scanner?mode=grades${subId ? `&subjectId=${subId}` : ''}&assignmentId=${assignment._id}&maxScore=${maxScore}`;
+    router.push(url);
+  };
+
   const formattedDueDate = (() => {
     if (!assignment.dueDate) return 'Sin fecha límite';
     try {
@@ -404,7 +413,7 @@ export default function AssignmentDetailView({ assignment, onBack }: AssignmentD
             <Button
               type="button"
               variant="primary"
-              onClick={() => router.push(`/scanner?mode=grades&assignmentId=${assignment._id}`)}
+              onClick={handleScanAssignment}
               leftIcon={<QrCode size={18} />}
               className="bg-[#009ee3] hover:bg-[#0284c7] text-white font-black text-xs px-5 py-3 rounded-2xl shadow-lg shadow-sky-500/25 transition-all cursor-pointer h-auto"
             >
@@ -698,7 +707,7 @@ export default function AssignmentDetailView({ assignment, onBack }: AssignmentD
                         <Button
                           type="button"
                           variant="primary"
-                          onClick={() => router.push(`/scanner?mode=grades&assignmentId=${assignment._id}`)}
+                          onClick={handleScanAssignment}
                           leftIcon={<QrCode size={15} />}
                           className="bg-[#009ee3] hover:bg-[#0284c7] text-white font-black text-xs px-4 py-1.5 rounded-full shadow-md transition-all cursor-pointer h-auto"
                         >

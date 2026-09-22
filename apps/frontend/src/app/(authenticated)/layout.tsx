@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { LayoutContext } from './layout-context';
 import { API_BASE_URL } from '@/config/api';
+import { isTokenExpired, clearAuthSession, handleAuthError } from '@/lib/auth';
+import { connectSocket, disconnectSocket } from '@/lib/socket';
 
 export default function AuthenticatedLayout({
   children,
@@ -37,8 +39,8 @@ export default function AuthenticatedLayout({
     const savedToken = localStorage.getItem('token');
     const savedUserStr = localStorage.getItem('user');
 
-    if (!savedToken || !savedUserStr) {
-      router.push('/login');
+    if (!savedToken || !savedUserStr || isTokenExpired(savedToken)) {
+      handleAuthError(router);
       return;
     }
 
@@ -65,75 +67,48 @@ export default function AuthenticatedLayout({
 
       setLoading(false);
     } catch {
-      router.push('/login');
+      handleAuthError(router);
       return;
     }
 
-    // Initialize WebSockets and load initial cache for teachers
+    // Initialize WebSockets using shared singleton
     if (parsedUser.role === 'TEACHER') {
+      const conn = connectSocket(parsedUser.teacherId, savedToken);
+      setSocket(conn);
 
-      let socketConnection: Socket | null = null;
-
-      const connectSocket = () => {
-        if (!socketConnection) {
-          const conn = io(API_BASE_URL, {
-            reconnection: true,
-            reconnectionAttempts: 5,
-            reconnectionDelay: 1000,
-            reconnectionDelayMax: 10000,
-            transports: ['websocket', 'polling']
-          });
-          socketConnection = conn;
-          setSocket(conn);
-
-          conn.on('connect', () => {
-            conn.emit('join_room', { teacherId: parsedUser.teacherId, token: savedToken });
-            addLog('Conectado al servidor de sincronización en tiempo real.');
-          });
-          
-          conn.on('connect_error', (err) => {
-            addLog(`Error de conexión: ${err.message}. Reintentando...`);
-          });
-        }
+      const handleConnect = () => {
+        addLog('Conectado al servidor de sincronización en tiempo real.');
       };
 
-      const disconnectSocket = () => {
-        if (socketConnection) {
-          socketConnection.disconnect();
-          socketConnection = null;
-          setSocket(null);
-          addLog('Desconectado del servidor de sincronización.');
-        }
+      const handleConnectError = (err: any) => {
+        addLog(`Error de conexión: ${err.message}. Reintentando...`);
       };
 
-      // Connect initially
-      connectSocket();
+      if (conn.connected) {
+        handleConnect();
+      }
+
+      conn.on('connect', handleConnect);
+      conn.on('connect_error', handleConnectError);
 
       const handleVisibilityChange = () => {
         if (document.visibilityState === 'visible') {
-          connectSocket();
-        } else {
-          disconnectSocket();
+          connectSocket(parsedUser.teacherId, savedToken);
         }
       };
 
-      const handlePageShow = (e: PageTransitionEvent) => {
-        connectSocket();
-      };
-
-      const handlePageHide = () => {
-        disconnectSocket();
+      const handlePageShow = () => {
+        connectSocket(parsedUser.teacherId, savedToken);
       };
 
       document.addEventListener('visibilitychange', handleVisibilityChange);
       window.addEventListener('pageshow', handlePageShow);
-      window.addEventListener('pagehide', handlePageHide);
 
       return () => {
-        disconnectSocket();
+        conn.off('connect', handleConnect);
+        conn.off('connect_error', handleConnectError);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
         window.removeEventListener('pageshow', handlePageShow);
-        window.removeEventListener('pagehide', handlePageHide);
       };
     }
   }, [router]);
@@ -155,13 +130,12 @@ export default function AuthenticatedLayout({
   }, [pathname, user, router]);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    if (socket) {
-      socket.disconnect();
-    }
-    router.push('/login');
+    clearAuthSession();
+    disconnectSocket();
+    setSocket(null);
+    router.replace('/login');
   };
+
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
   const isUnauthorized = Boolean(

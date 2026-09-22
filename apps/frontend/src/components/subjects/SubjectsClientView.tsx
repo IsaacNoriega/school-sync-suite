@@ -14,6 +14,7 @@ import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import { Button, Input, Card, Badge } from '@/components/ui';
 import { API_BASE_URL } from '@/config/api';
+import { handleAuthError } from '@/lib/auth';
 
 const CreateSubjectModal = dynamic(() => import('@/components/CreateSubjectModal'), { ssr: false });
 const EditSubjectModal = dynamic(() => import('@/components/EditSubjectModal'), { ssr: false });
@@ -222,12 +223,19 @@ export default function SubjectsClientView() {
         },
       });
       if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          handleAuthError(router);
+          return;
+        }
         throw new Error('Error al cargar materias');
       }
       const data: SubjectItem[] = await res.json();
       setSubjects(data);
       if (data.length > 0 && selectedSubject === 'all') {
-        setSelectedSubject(data[0]._id);
+        const firstId = typeof data[0]._id === 'object' && data[0]._id !== null
+          ? (data[0]._id as any)._id || String(data[0]._id)
+          : String(data[0]._id);
+        setSelectedSubject(firstId);
       }
     } catch (err: any) {
       console.error('Error fetching subjects:', err);
@@ -235,7 +243,7 @@ export default function SubjectsClientView() {
     } finally {
       setLoadingSubjects(false);
     }
-  }, [selectedSubject]);
+  }, [selectedSubject, router]);
 
   // Fetch students info to get group name and count
   const fetchStudentsInfo = useCallback(async () => {
@@ -249,9 +257,6 @@ export default function SubjectsClientView() {
       if (res.ok) {
         const data = await res.json();
         setTotalStudentsCount(data.length);
-        if (data.length > 0 && data[0].group) {
-          setSelectedGroup(data[0].group);
-        }
       }
     } catch (err) {
       console.error('Error fetching students count:', err);
@@ -259,17 +264,29 @@ export default function SubjectsClientView() {
   }, []);
 
   // Fetch assignments from real backend based on selectedSubject
-  const fetchAssignments = useCallback(async (subjectId?: string) => {
+  const fetchAssignments = useCallback(async (rawSubjectId?: any) => {
     const token = getAuthToken();
     try {
       setLoadingAssignments(true);
-      const queryParam = subjectId && subjectId !== 'all' ? `?subjectId=${subjectId}` : '';
+      let cleanSubjectId = '';
+      if (rawSubjectId && rawSubjectId !== 'all') {
+        if (typeof rawSubjectId === 'object' && rawSubjectId !== null) {
+          cleanSubjectId = rawSubjectId._id || rawSubjectId.id || '';
+        } else if (typeof rawSubjectId === 'string' && rawSubjectId !== '[object Object]') {
+          cleanSubjectId = rawSubjectId.trim();
+        }
+      }
+      const queryParam = cleanSubjectId ? `?subjectId=${cleanSubjectId}` : '';
       const res = await fetch(`${API_BASE_URL}/assignments${queryParam}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
       if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          handleAuthError(router);
+          return;
+        }
         throw new Error('Error al cargar tareas');
       }
       const data: AssignmentItem[] = await res.json();
@@ -280,7 +297,7 @@ export default function SubjectsClientView() {
     } finally {
       setLoadingAssignments(false);
     }
-  }, []);
+  }, [router]);
 
   // Initial load
   useEffect(() => {
@@ -403,6 +420,10 @@ export default function SubjectsClientView() {
     iconKey: string;
   }) => {
     const token = getAuthToken();
+    const cleanSubId = typeof formData.subjectId === 'object' && formData.subjectId !== null
+      ? (formData.subjectId as any)._id || String(formData.subjectId)
+      : String(formData.subjectId || '').trim();
+
     const res = await fetch(`${API_BASE_URL}/assignments`, {
       method: 'POST',
       headers: {
@@ -410,7 +431,7 @@ export default function SubjectsClientView() {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        subjectId: formData.subjectId,
+        subjectId: cleanSubId,
         title: formData.title,
         maxScore: formData.maxScore,
         dueDate: formData.dueDate,
@@ -420,12 +441,18 @@ export default function SubjectsClientView() {
     });
 
     if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        handleAuthError(router);
+        return;
+      }
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.message || 'Error al crear la tarea');
     }
 
+    const created = await res.json().catch(() => null);
     await fetchAssignments(selectedSubject);
     await fetchSubjects();
+    return created;
   };
 
   // Handle Edit Assignment
@@ -487,6 +514,14 @@ export default function SubjectsClientView() {
       toast.error(err.message || 'No se pudo eliminar la tarea');
       setDeleteConfirmation((prev) => ({ ...prev, loading: false }));
     }
+  };
+
+  const handleScanTask = (task: AssignmentItem) => {
+    const subId = typeof task.subject === 'object' && task.subject !== null
+      ? task.subject._id
+      : (task.subject || selectedSubject);
+    const maxScore = task.maxScore || 100;
+    router.push(`/scanner?mode=grades&subjectId=${subId}&assignmentId=${task._id}&maxScore=${maxScore}`);
   };
 
   const [isExportingExcel, setIsExportingExcel] = useState(false);
@@ -577,7 +612,6 @@ export default function SubjectsClientView() {
             'N°': index + 1,
             'Matrícula': student.enrollmentNumber || 'S/N',
             'Nombre del Alumno': student.name,
-            'Grupo': student.group || selectedGroup || 'General',
           };
 
           let sumScores = 0;
@@ -647,7 +681,6 @@ export default function SubjectsClientView() {
           'N°': index + 1,
           'Matrícula': student.enrollmentNumber || 'S/N',
           'Nombre del Alumno': student.name,
-          'Grupo': student.group || selectedGroup || 'General',
         };
 
         let totalAvgSum = 0;
@@ -972,7 +1005,7 @@ export default function SubjectsClientView() {
                         <Button
                           variant="primary"
                           leftIcon={<QrCode size={16} />}
-                          onClick={() => router.push(`/scanner?mode=grades&assignmentId=${task._id}`)}
+                          onClick={() => handleScanTask(task)}
                           className="bg-[#0284c7] hover:bg-[#0369a1] text-white px-4 py-2 text-xs font-black shadow-sm"
                         >
                           Escanear QR
@@ -983,7 +1016,7 @@ export default function SubjectsClientView() {
                         <Button
                           variant="warning"
                           leftIcon={<QrCode size={16} />}
-                          onClick={() => router.push(`/scanner?mode=grades&assignmentId=${task._id}`)}
+                          onClick={() => handleScanTask(task)}
                           className="bg-[#f59e0b] hover:bg-[#d97706] text-white px-4 py-2 text-xs font-black shadow-sm"
                         >
                           Escanear QR
@@ -1005,7 +1038,7 @@ export default function SubjectsClientView() {
                         <Button
                           variant="danger"
                           leftIcon={<ScanLine size={16} />}
-                          onClick={() => router.push(`/scanner?mode=grades&assignmentId=${task._id}`)}
+                          onClick={() => handleScanTask(task)}
                           className="bg-[#f43f5e] hover:bg-[#e11d48] text-white px-4 py-2 text-xs font-black shadow-sm"
                         >
                           Escanear
@@ -1091,7 +1124,11 @@ export default function SubjectsClientView() {
         isOpen={isCreateAssignmentModalOpen}
         onClose={() => setIsCreateAssignmentModalOpen(false)}
         subjects={subjects}
-        defaultSubjectId={selectedSubject !== 'all' ? selectedSubject : subjects[0]?._id}
+        defaultSubjectId={
+          selectedSubject && selectedSubject !== 'all' && selectedSubject !== '[object Object]'
+            ? (typeof selectedSubject === 'object' && selectedSubject !== null ? (selectedSubject as any)._id : String(selectedSubject))
+            : (subjects[0] ? (typeof subjects[0]._id === 'object' && subjects[0]._id !== null ? (subjects[0]._id as any)._id || String(subjects[0]._id) : String(subjects[0]._id)) : '')
+        }
         onSubmit={handleCreateAssignment}
       />
 

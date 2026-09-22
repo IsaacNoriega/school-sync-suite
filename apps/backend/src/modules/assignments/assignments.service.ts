@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Assignment, AssignmentDocument } from '../../database/schemas/assignment.schema';
@@ -17,7 +17,7 @@ export class AssignmentsService {
 
   async create(
     teacherId: string,
-    subjectId: string,
+    rawSubjectId: any,
     title: string,
     description?: string,
     maxScore = 10,
@@ -26,6 +26,14 @@ export class AssignmentsService {
     color?: string,
     iconKey?: string,
   ) {
+    const subjectId = typeof rawSubjectId === 'object' && rawSubjectId !== null
+      ? (rawSubjectId._id || rawSubjectId.id || String(rawSubjectId))
+      : String(rawSubjectId || '');
+
+    if (!subjectId || subjectId === '[object Object]' || !Types.ObjectId.isValid(subjectId)) {
+      throw new BadRequestException('El identificador de la asignatura no es válido.');
+    }
+
     const subject = await this.subjectsService.findOne(teacherId, subjectId);
 
     const existingAssignment = await this.assignmentModel.findOne({ subject: subjectId, title }).lean().exec();
@@ -52,13 +60,15 @@ export class AssignmentsService {
     });
   }
 
-  async findAllBySubject(teacherId: string, subjectId?: string) {
+  async findAllBySubject(teacherId: string, rawSubjectId?: any) {
+    const subjectId = typeof rawSubjectId === 'object' && rawSubjectId !== null
+      ? (rawSubjectId._id || rawSubjectId.id || String(rawSubjectId))
+      : (rawSubjectId ? String(rawSubjectId) : '');
+
     let query: any = {};
-    if (subjectId && subjectId !== 'all') {
+    if (subjectId && subjectId !== 'all' && subjectId !== '[object Object]' && Types.ObjectId.isValid(subjectId)) {
       await this.subjectsService.findOne(teacherId, subjectId);
-      query = Types.ObjectId.isValid(subjectId)
-        ? { $or: [{ subject: subjectId }, { subject: new Types.ObjectId(subjectId) }] }
-        : { subject: subjectId };
+      query = { $or: [{ subject: subjectId }, { subject: new Types.ObjectId(subjectId) }] };
     } else {
       const subjects = await this.subjectsService.findAll(teacherId);
       const subjectIds = subjects.map((s: any) => s._id);
@@ -111,7 +121,15 @@ export class AssignmentsService {
     return enriched;
   }
 
-  async findOne(teacherId: string, id: string) {
+  async findOne(teacherId: string, rawId: any) {
+    const id = typeof rawId === 'object' && rawId !== null
+      ? (rawId._id || rawId.id || String(rawId))
+      : String(rawId || '');
+
+    if (!id || id === '[object Object]' || !Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('El identificador de la tarea no es válido.');
+    }
+
     const assignment = await this.assignmentModel.findById(id).populate('subject').lean().exec();
     if (!assignment) {
       throw new NotFoundException('Assignment not found');

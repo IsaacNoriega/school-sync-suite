@@ -10,7 +10,10 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "seed:admin": "node create-admin.js",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -38,10 +41,15 @@
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
     "@nestjs/schematics": "^10.0.0",
+    "@nestjs/testing": "^10.4.22",
     "@types/bcryptjs": "^2.4.2",
     "@types/express": "^4.17.17",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.0.0",
     "@types/passport-jwt": "^3.0.8",
+    "jest": "^30.5.1",
+    "socket.io-client": "^4.8.3",
+    "ts-jest": "^29.4.12",
     "typescript": "^5.0.0"
   }
 }

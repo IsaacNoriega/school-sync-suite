@@ -1,21 +1,23 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, Types } from 'mongoose';
 import { Student } from './student.schema';
-import { Subject } from './subject.schema';
 import { AttendanceStatus } from '@school-sync/shared';
 
 export type AttendanceDocument = HydratedDocument<Attendance>;
 
 @Schema({ timestamps: true })
-export class Attendance extends Document {
-  @Prop({ type: Types.ObjectId, ref: 'Student', required: true, index: true })
+export class Attendance {
+  // Sin index: true redundante (cubierto por el índice compuesto único student_1_date_1)
+  @Prop({ type: Types.ObjectId, ref: 'Student', required: true })
   student: Types.ObjectId | Student;
 
+  @Prop({
+    required: true,
+    match: [/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe cumplir el formato YYYY-MM-DD'],
+  })
+  date: string; // Formato YYYY-MM-DD
 
-  @Prop({ required: true, index: true })
-  date: string; // Formatted YYYY-MM-DD
-
-  @Prop({ required: true, enum: ['PRESENT', 'ABSENT', 'LATE'] })
+  @Prop({ required: true, enum: ['PRESENT', 'ABSENT', 'LATE'], default: 'PRESENT' })
   status: AttendanceStatus;
 
   @Prop({ default: Date.now })
@@ -24,14 +26,16 @@ export class Attendance extends Document {
 
 export const AttendanceSchema = SchemaFactory.createForClass(Attendance);
 
-// Unicidad: un alumno solo puede tener un registro de asistencia por día
+// 1. Índice Compuesto Único: Garantiza atomicidad y cubre consultas por student solo o student+date
 AttendanceSchema.index({ student: 1, date: 1 }, { unique: true });
 
-// Índice compuesto principal para getDashboardMetrics:
-// - Consulta diaria: { student: { $in: [...] }, date: <fecha> }
-// - Consulta mensual: { student: { $in: [...] }, date: { $gte, $lte }, status: { $in } }
-// Un solo índice (student, date, status) cubre ambas por prefix matching
+// 2. Índice para consultas y reportes agregados por fecha
+AttendanceSchema.index({ date: 1 });
+
+// 3. Índice Compuesto de Cobertura para Agregaciones Mensuales del Dashboard:
+// Cubre el pipeline $match { student: $in, date: { $gte, $lte }, status: $in } y $group { _id: '$student' }
+// Al contener (student, date, status), MongoDB resuelve la agregación al 100% en el índice B-Tree (Covered Query)
+// sin cargar documentos planos de disco (totalDocsExamined: 0).
 AttendanceSchema.index({ student: 1, date: 1, status: 1 });
 
-// Índice para consultas por fecha sola (reportes globales / super admin)
-AttendanceSchema.index({ date: 1 });
+

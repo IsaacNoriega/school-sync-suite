@@ -1,11 +1,12 @@
 'use client';
 
 import React from 'react';
-import { ArrowUp, BookOpen, Info, Loader2, Mail, MessageCircle, QrCode, UserCheck } from 'lucide-react';
+import { ArrowUp, BookOpen, Calendar, Loader2, UserCheck } from 'lucide-react';
 import { Card, Button, Badge } from '@/components/ui';
 
 export interface GradeRecord {
   id: string;
+  studentId?: string;
   name: string;
   enrollment: string;
   scanTime: string;
@@ -19,6 +20,7 @@ export interface GradeRecord {
 
 export interface AttendanceRecord {
   id: string;
+  studentId?: string;
   name: string;
   enrollment: string;
   entryTime: string;
@@ -38,7 +40,6 @@ export interface RealtimeScanTableProps {
   attendanceRecords: AttendanceRecord[];
   loadingGrades: boolean;
   loadingAttendance: boolean;
-  onOpenCriteria?: () => void;
   onOpenHistory?: () => void;
 }
 
@@ -48,7 +49,6 @@ export const RealtimeScanTable = React.memo<RealtimeScanTableProps>(function Rea
   attendanceRecords,
   loadingGrades,
   loadingAttendance,
-  onOpenCriteria,
   onOpenHistory,
 }) {
   return (
@@ -60,17 +60,11 @@ export const RealtimeScanTable = React.memo<RealtimeScanTableProps>(function Rea
 
         <div className="flex items-center gap-3">
           <Button
-            variant="ghost"
-            leftIcon={<Info size={16} className="text-slate-400" />}
-            onClick={onOpenCriteria}
-            className="text-xs font-bold text-slate-500 hover:text-slate-900"
-          >
-            Criterios de Asistencia
-          </Button>
-          <Button
-            variant="ghost"
+            variant="outline"
+            size="sm"
+            leftIcon={<Calendar size={15} className="text-sky-600" />}
             onClick={onOpenHistory}
-            className="text-xs font-bold text-slate-500 hover:text-slate-900"
+            className="text-xs font-bold text-slate-700 hover:text-sky-600 hover:border-sky-300 transition-all shadow-2xs"
           >
             Historial Completo
           </Button>
@@ -84,21 +78,15 @@ export const RealtimeScanTable = React.memo<RealtimeScanTableProps>(function Rea
           <>
             {/* Encabezados de Columna */}
             <div className="grid grid-cols-12 gap-4 px-5 text-[11px] font-black uppercase text-slate-400 tracking-wider items-center pb-2 select-none">
-              <div className="col-span-12 md:col-span-4 flex items-center gap-1">
+              <div className="col-span-12 md:col-span-6 flex items-center gap-1">
                 <span>NOMBRE DEL ALUMNO</span>
                 <ArrowUp size={13} className="text-slate-400" />
               </div>
-              <div className="hidden md:block col-span-2 text-center">
+              <div className="hidden md:block col-span-3 text-center">
                 HORA DE REGISTRO
               </div>
               <div className="hidden md:block col-span-3 text-center">
                 CALIFICACIÓN ASIGNADA ↕
-              </div>
-              <div className="hidden md:block col-span-2 text-center">
-                PUNTOS / GAMIFICACIÓN
-              </div>
-              <div className="hidden md:block col-span-1 text-center">
-                CREDENCIAL QR
               </div>
             </div>
 
@@ -129,11 +117,11 @@ export const RealtimeScanTable = React.memo<RealtimeScanTableProps>(function Rea
 
                   return (
                     <div
-                      key={record.id}
+                      key={record.studentId || record.id}
                       className="bg-white rounded-2xl p-4 grid grid-cols-12 gap-4 items-center border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-slate-200 transition-all duration-200"
                     >
                       {/* Columna 1: Avatar + Nombre + Matrícula */}
-                      <div className="col-span-12 md:col-span-4 flex items-center gap-3.5">
+                      <div className="col-span-12 md:col-span-6 flex items-center gap-3.5">
                         <div className={`w-11 h-11 rounded-full ${avatarStyle.bg} ${avatarStyle.text} font-black text-xs flex items-center justify-center shrink-0 shadow-xs`}>
                           {getInitials(record.name)}
                         </div>
@@ -153,7 +141,7 @@ export const RealtimeScanTable = React.memo<RealtimeScanTableProps>(function Rea
                       </div>
 
                       {/* Columna 2: Hora de Registro */}
-                      <div className="col-span-6 md:col-span-2 text-center">
+                      <div className="col-span-6 md:col-span-3 text-center">
                         <div className="font-extrabold text-slate-900 text-sm">
                           {record.scanTime}
                         </div>
@@ -165,7 +153,7 @@ export const RealtimeScanTable = React.memo<RealtimeScanTableProps>(function Rea
                       {/* Columna 3: Calificación Asignada */}
                       <div className="col-span-6 md:col-span-3 flex items-center justify-center">
                         <Badge
-                          className={`text-xs font-black px-3.5 py-1.5 rounded-xl border border-sky-200/70 ${
+                          className={`text-xs font-black px-4 py-1.5 rounded-xl border border-sky-200/70 shadow-xs ${
                             record.score >= 90
                               ? 'bg-[#e0f2fe] text-[#0369a1]'
                               : record.score >= 70
@@ -175,28 +163,6 @@ export const RealtimeScanTable = React.memo<RealtimeScanTableProps>(function Rea
                         >
                           {record.score} pts
                         </Badge>
-                      </div>
-
-                      {/* Columna 4: Puntos / Gamificación */}
-                      <div className="col-span-6 md:col-span-2 flex items-center justify-center">
-                        <Badge
-                          className={`text-xs font-black px-3.5 py-1 rounded-full text-white ${
-                            record.points >= 10 ? 'bg-[#84cc16]' : 'bg-[#f59e0b]'
-                          }`}
-                        >
-                          +{record.points}
-                        </Badge>
-                      </div>
-
-                      {/* Columna 5: Credencial QR */}
-                      <div className="col-span-6 md:col-span-1 flex items-center justify-center">
-                        <Button
-                          variant="icon"
-                          className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-500 hover:text-sky-600 hover:bg-slate-100 shadow-2xs"
-                          title="Ver credencial QR"
-                        >
-                          <QrCode size={16} />
-                        </Button>
                       </div>
                     </div>
                   );
@@ -219,21 +185,15 @@ export const RealtimeScanTable = React.memo<RealtimeScanTableProps>(function Rea
           <>
             {/* Encabezados de Columna */}
             <div className="grid grid-cols-12 gap-4 px-5 text-[11px] font-black uppercase text-slate-400 tracking-wider items-center pb-2 select-none">
-              <div className="col-span-12 md:col-span-4 flex items-center gap-1">
+              <div className="col-span-12 md:col-span-5 flex items-center gap-1">
                 <span>NOMBRE DEL ALUMNO</span>
                 <ArrowUp size={13} className="text-slate-400" />
               </div>
-              <div className="hidden md:block col-span-2 text-center">
+              <div className="hidden md:block col-span-3 text-center">
                 HORA DE ENTRADA
               </div>
-              <div className="hidden md:block col-span-3 text-center">
+              <div className="hidden md:block col-span-4 text-center">
                 ESTADO DE ASISTENCIA
-              </div>
-              <div className="hidden md:block col-span-2 text-center">
-                NOTIFICACIÓN A PADRES
-              </div>
-              <div className="hidden md:block col-span-1 text-center">
-                CREDENCIAL QR
               </div>
             </div>
 
@@ -264,11 +224,11 @@ export const RealtimeScanTable = React.memo<RealtimeScanTableProps>(function Rea
 
                   return (
                     <div
-                      key={record.id}
+                      key={record.studentId || record.id}
                       className="bg-white rounded-2xl p-4 grid grid-cols-12 gap-4 items-center border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-slate-200 transition-all duration-200"
                     >
                       {/* Columna 1: Avatar + Nombre + Matrícula */}
-                      <div className="col-span-12 md:col-span-4 flex items-center gap-3.5">
+                      <div className="col-span-12 md:col-span-5 flex items-center gap-3.5">
                         <div className={`w-11 h-11 rounded-full ${avatarStyle.bg} ${avatarStyle.text} font-black text-xs flex items-center justify-center shrink-0 shadow-xs`}>
                           {getInitials(record.name)}
                         </div>
@@ -288,7 +248,7 @@ export const RealtimeScanTable = React.memo<RealtimeScanTableProps>(function Rea
                       </div>
 
                       {/* Columna 2: Hora de Entrada */}
-                      <div className="col-span-6 md:col-span-2 text-center">
+                      <div className="col-span-6 md:col-span-3 text-center">
                         <div className="font-extrabold text-slate-900 text-sm">
                           {record.entryTime}
                         </div>
@@ -298,9 +258,9 @@ export const RealtimeScanTable = React.memo<RealtimeScanTableProps>(function Rea
                       </div>
 
                       {/* Columna 3: Estado de Asistencia */}
-                      <div className="col-span-6 md:col-span-3 flex items-center justify-center">
+                      <div className="col-span-6 md:col-span-4 flex items-center justify-center">
                         <Badge
-                          className={`text-xs font-black px-3.5 py-1.5 rounded-full border-none flex items-center gap-1.5 ${
+                          className={`text-xs font-black px-4 py-1.5 rounded-full border-none flex items-center gap-1.5 shadow-2xs ${
                             record.status === 'punctual'
                               ? 'bg-[#dcfce7] text-[#15803d]'
                               : record.status === 'late'
@@ -317,32 +277,6 @@ export const RealtimeScanTable = React.memo<RealtimeScanTableProps>(function Rea
                           }`} />
                           {record.statusText}
                         </Badge>
-                      </div>
-
-                      {/* Columna 4: Notificación a Padres */}
-                      <div className="col-span-6 md:col-span-2 flex items-center justify-center">
-                        {record.notificationType === 'whatsapp' ? (
-                          <div className="text-[#15803d] font-bold text-xs flex items-center gap-1.5">
-                            <MessageCircle size={15} className="text-[#25D366] fill-[#25D366]" />
-                            <span>WhatsApp Enviado</span>
-                          </div>
-                        ) : (
-                          <div className="text-[#b45309] font-bold text-xs flex items-center gap-1.5">
-                            <Mail size={15} className="text-[#f59e0b]" />
-                            <span>SMS Confirmado</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Columna 5: Credencial QR */}
-                      <div className="col-span-6 md:col-span-1 flex items-center justify-center">
-                        <Button
-                          variant="icon"
-                          className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-500 hover:text-sky-600 hover:bg-slate-100 shadow-2xs"
-                          title="Ver credencial QR"
-                        >
-                          <QrCode size={16} />
-                        </Button>
                       </div>
                     </div>
                   );

@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@radix-ui/react-popover": "^1.1.23",
+    "@radix-ui/react-select": "^2.3.7",
     "@school-sync/shared": "workspace:*",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
@@ -19,6 +21,7 @@
     "react-day-picker": "^10.0.1",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.6.0",
+    "sharp": "^0.35.4",
     "socket.io-client": "^4.7.2",
     "tailwind-merge": "^3.7.0",
     "xlsx": "^0.18.5"

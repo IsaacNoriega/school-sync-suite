@@ -20,7 +20,7 @@ export interface NavigationItem {
 }
 
 export interface EducaNavbarProps {
-  activeTab?: 'dashboard' | 'scanner' | 'students' | 'subjects' | 'reports' | 'admin' | string;
+  activeTab?: 'dashboard' | 'scanner' | 'attendance' | 'students' | 'subjects' | 'reports' | 'admin' | string;
   onNavigate?: (id: string) => void;
   currentGroup?: string;
   teacherName?: string;
@@ -47,6 +47,7 @@ export const EducaNavbar: React.FC<EducaNavbarProps> = ({
   const initialActive = (() => {
     if (activeTab && activeTab !== 'dashboard') return activeTab;
     if (pathname?.includes('/scanner')) return 'scanner';
+    if (pathname?.includes('/attendance')) return 'attendance';
     if (pathname?.includes('/students')) return 'students';
     if (pathname?.includes('/subjects')) return 'subjects';
     if (pathname?.includes('/admin')) return 'admin';
@@ -82,6 +83,40 @@ export const EducaNavbar: React.FC<EducaNavbarProps> = ({
   const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
 
   // Definición de las rutas según el rol
+  const teacherNavItems: NavigationItem[] = [
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      tooltip: 'Resumen del día, alertas y accesos rápidos',
+      path: '/dashboard',
+    },
+    {
+      id: 'scanner',
+      label: 'Escáner QR',
+      isSpecial: true, // "Joya de la corona"
+      tooltip: 'Pase de lista y calificación continua',
+      path: '/scanner',
+    },
+    {
+      id: 'attendance',
+      label: 'Historial Asistencia',
+      tooltip: 'Historial diario y reportes mensuales con exportación a Excel',
+      path: '/attendance',
+    },
+    {
+      id: 'students',
+      label: 'Registrar Alumnos',
+      tooltip: 'Registro, credenciales y gafetes QR',
+      path: '/students',
+    },
+    {
+      id: 'subjects',
+      label: 'Materias y Tareas',
+      tooltip: 'Carpetas de colores, asignaciones y puntajes',
+      path: '/subjects',
+    },
+  ];
+
   const navigationItems: NavigationItem[] = isSuperAdmin
     ? [
         {
@@ -90,34 +125,9 @@ export const EducaNavbar: React.FC<EducaNavbarProps> = ({
           tooltip: 'Panel de administración escolar y gestión de maestros',
           path: '/admin',
         },
+        ...teacherNavItems,
       ]
-    : [
-        {
-          id: 'dashboard',
-          label: 'Dashboard',
-          tooltip: 'Resumen del día, alertas y accesos rápidos',
-          path: '/dashboard',
-        },
-        {
-          id: 'scanner',
-          label: 'Escáner QR',
-          isSpecial: true, // "Joya de la corona"
-          tooltip: 'Pase de lista y calificación continua',
-          path: '/scanner',
-        },
-        {
-          id: 'students',
-          label: 'Registrar Alumnos',
-          tooltip: 'Registro, credenciales y gafetes QR',
-          path: '/students',
-        },
-        {
-          id: 'subjects',
-          label: 'Materias y Tareas',
-          tooltip: 'Carpetas de colores, asignaciones y puntajes',
-          path: '/subjects',
-        },
-      ];
+    : teacherNavItems;
 
   const handleLogoutClick = () => {
     setIsUserMenuOpen(false);
@@ -133,7 +143,7 @@ export const EducaNavbar: React.FC<EducaNavbarProps> = ({
 
   return (
     <>
-      <header className="w-full bg-white/95 backdrop-blur-md sticky top-0 z-50 px-6 py-3 shadow-[0_4px_25px_rgba(0,0,0,0.03)] select-none">
+      <header className="w-full bg-white/95 backdrop-blur-md sticky top-0 z-50 px-6 py-3 shadow-[0_4px_25px_rgba(0,0,0,0.03)] select-none print:hidden">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           {/* ========================================================
               1. MARCA CON SÍMBOLOS LÚDICOS (+, -, ×, ÷) Y NOMBRE

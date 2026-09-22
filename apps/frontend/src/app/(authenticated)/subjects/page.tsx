@@ -1,20 +1,22 @@
 import type { Metadata } from 'next';
 import EducaNavbar from '@/components/EducaNavbar';
-import SubjectsClientView from '@/components/subjects/SubjectsClientView';
+import SubjectsGridView from '@/components/subjects/SubjectsGridView';
 
 export const metadata: Metadata = {
-  title: 'Gestión de Materias y Tareas | EducaQR',
-  description: 'Planifica tus lecciones, administra hojas de examen y califica con códigos QR al instante.',
+  title: 'Mis Asignaturas | EducaQR',
+  description: 'Vista general y gestión de asignaturas escolares.',
 };
 
 export default function SubjectsPage() {
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 pb-20 select-none font-sans">
-      {/* 1. Header de Navegación Principal */}
+      {/* Header de Navegación Principal */}
       <EducaNavbar activeTab="subjects" />
 
-      {/* 2. Vista interactiva de materias y tareas */}
-      <SubjectsClientView />
+      {/* Nivel 1: Cuadrícula interactiva de materias */}
+      <main>
+        <SubjectsGridView basePath="/subjects" />
+      </main>
     </div>
   );
 }

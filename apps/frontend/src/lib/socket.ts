@@ -22,6 +22,10 @@ export interface RealtimeScanPayload {
  * Obtiene o crea la conexión singleton de Socket.io
  */
 export function getSocket(token?: string): Socket {
+  const authToken =
+    token ||
+    (typeof window !== 'undefined' ? localStorage.getItem('token') || undefined : undefined);
+
   if (!socket) {
     socket = io(API_BASE_URL, {
       reconnection: true,
@@ -29,8 +33,10 @@ export function getSocket(token?: string): Socket {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       transports: ['websocket', 'polling'],
-      auth: token ? { token } : undefined,
+      auth: authToken ? { token: authToken } : undefined,
     });
+  } else if (authToken && (!socket.auth || !(socket.auth as any).token)) {
+    socket.auth = { token: authToken };
   }
   return socket;
 }
@@ -48,7 +54,8 @@ export function connectSocket(teacherId: string, token: string): Socket {
   if (s.connected) {
     join();
   } else {
-    s.on('connect', join);
+    // Usar .once para que el listener se limpie tras ejecutarse y evitar memory leaks
+    s.once('connect', join);
   }
 
   return s;

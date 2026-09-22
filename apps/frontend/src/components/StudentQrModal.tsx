@@ -21,7 +21,7 @@ export default function StudentQrModal({
   };
 
   return (
-    <div style={{
+    <div className="print:hidden" style={{
       position: 'fixed',
       top: 0,
       left: 0,

@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Subject, SubjectDocument } from '../../database/schemas/subject.schema';
@@ -63,6 +63,8 @@ export class SubjectsService {
         });
         return {
           ...s,
+          _id: subIdStr,
+          teacher: s.teacher?.toString() || s.teacher,
           activeTasksCount,
         };
       })
@@ -70,7 +72,15 @@ export class SubjectsService {
     return enriched;
   }
 
-  async findOne(teacherId: string, id: string) {
+  async findOne(teacherId: string, rawId: any) {
+    const id = typeof rawId === 'object' && rawId !== null
+      ? (rawId._id || rawId.id || String(rawId))
+      : String(rawId || '');
+
+    if (!id || id === '[object Object]' || !Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('El identificador de la asignatura no es válido.');
+    }
+
     const subject = await this.subjectModel.findById(id).lean().exec();
     if (!subject) {
       throw new NotFoundException('Subject not found');
@@ -78,7 +88,11 @@ export class SubjectsService {
     if (subject.teacher.toString() !== teacherId) {
       throw new ForbiddenException('You do not own this subject');
     }
-    return subject;
+    return {
+      ...subject,
+      _id: subject._id.toString(),
+      teacher: subject.teacher.toString(),
+    };
   }
 
   async update(teacherId: string, id: string, name?: string, code?: string, description?: string, color?: string, iconKey?: string) {
