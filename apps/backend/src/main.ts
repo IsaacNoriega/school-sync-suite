@@ -4,6 +4,7 @@ dotenv.config();
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import helmet from 'helmet';
+import * as cookieParser from 'cookie-parser';
 import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -35,7 +36,18 @@ async function bootstrap() {
   app.use(json({ limit: '1mb' }));
   app.use(urlencoded({ extended: true, limit: '1mb' }));
 
-  // 4. Seguridad: CORS robusto con Allowlist dinámica
+  // 4. Proxy Trust: Render y la mayoría de PaaS usan un reverse proxy/load balancer.
+  // Sin esto, Express ve la IP del proxy (siempre la misma) y el ThrottlerGuard
+  // aplica rate-limiting GLOBAL en lugar de por IP real del cliente.
+  // Valor '1' = confiar en el primer proxy de la cadena X-Forwarded-For (Render).
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', 1);
+
+  // 5. Cookies: parseador de cookies para que los guards de Passport y el
+  // gateway de Socket.IO puedan leer la cookie HttpOnly 'access_token'.
+  app.use(cookieParser());
+
+  // 6. Seguridad: CORS robusto con Allowlist dinámica
   const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3000')
     .split(',')
     .map((origin) => origin.trim())

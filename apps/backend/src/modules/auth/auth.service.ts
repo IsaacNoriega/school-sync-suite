@@ -1,6 +1,6 @@
-import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Injectable, ConflictException, UnauthorizedException, Logger } from '@nestjs/common';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
+import { Model, Connection } from 'mongoose';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../../database/schemas/user.schema';
@@ -10,12 +10,34 @@ import { LoginDto, RegisterTeacherDto, ChangePasswordDto, UpdateProfileDto } fro
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Teacher.name) private teacherModel: Model<Teacher>,
     @InjectModel(Subject.name) private subjectModel: Model<Subject>,
+    @InjectConnection() private readonly connection: Connection,
     private jwtService: JwtService,
   ) {}
+
+  // ─── Helper privado ──────────────────────────────────────────────────────────
+  // Extrae y normaliza los detalles del Teacher asociado a un userId.
+  // Elimina la duplicación que existía en login(), getProfile() y updateProfile().
+  private async buildTeacherDetails(userId: any): Promise<Record<string, string> | null> {
+    const teacher = await this.teacherModel
+      .findOne({ user: userId })
+      .lean()
+      .exec();
+    if (!teacher) return null;
+    return {
+      teacherId: (teacher as any)._id.toString(),
+      name: (teacher as any).name,
+      schoolName: (teacher as any).schoolName,
+      schoolCycle: (teacher as any).schoolCycle ?? '2025-2026',
+      entryTime: (teacher as any).entryTime ?? '07:30',
+      shift: (teacher as any).shift ?? 'Matutino',
+    };
+  }
 
   async seedAdmin() {
     const adminExists = await this.userModel.findOne({ role: 'SUPER_ADMIN' }).exec();
@@ -23,7 +45,8 @@ export class AuthService {
       const adminEmail = process.env.ADMIN_EMAIL;
       const adminPassword = process.env.ADMIN_PASSWORD;
       if (!adminEmail || !adminPassword) {
-        console.warn('ADMIN_EMAIL or ADMIN_PASSWORD env vars not set. Skipping SUPER_ADMIN seed.');
+        // I-03: Logger estructurado en lugar de console.warn
+        this.logger.warn('ADMIN_EMAIL o ADMIN_PASSWORD no definidas. Seed de SUPER_ADMIN omitido.');
         return;
       }
       const passwordHash = await bcrypt.hash(adminPassword, 12);
@@ -33,7 +56,7 @@ export class AuthService {
         role: 'SUPER_ADMIN',
         isActive: true,
       });
-      console.log(`--- ADMIN SEED CREATED --- ${adminEmail}`);
+      this.logger.log(`SUPER_ADMIN seed creado exitosamente para: ${adminEmail}`);
     }
   }
 
@@ -52,22 +75,11 @@ export class AuthService {
       throw new UnauthorizedException('User account is suspended');
     }
 
-    const payload = { sub: user._id, role: user.role, email: user.email };
-    
-    let teacherDetails = null;
-    if (user.role === 'TEACHER' || user.role === 'SUPER_ADMIN') {
-      const teacher = await this.teacherModel.findOne({ user: user._id }).lean().exec();
-      if (teacher) {
-        teacherDetails = {
-          teacherId: teacher._id.toString(),
-          name: teacher.name,
-          schoolName: teacher.schoolName,
-          schoolCycle: teacher.schoolCycle || '2025-2026',
-          entryTime: teacher.entryTime || '07:30',
-          shift: teacher.shift || 'Matutino',
-        };
-        payload['teacherId'] = teacher._id.toString();
-      }
+    const payload: any = { sub: user._id, role: user.role, email: user.email };
+    // I-02: buildTeacherDetails() reemplaza el bloque duplicado de fetch del Teacher
+    const teacherDetails = await this.buildTeacherDetails(user._id);
+    if (teacherDetails) {
+      payload.teacherId = teacherDetails.teacherId;
     }
 
     return {
@@ -82,40 +94,67 @@ export class AuthService {
   }
 
   async registerTeacher(registerDto: RegisterTeacherDto) {
-    const userExists = await this.userModel.findOne({ email: registerDto.email }).lean().exec();
+    // C-03: Validación PREVIA a la sesión para mejor DX en caso de email duplicado.
+    // bcrypt.hash (~80ms) se ejecuta fuera de la transacción para no mantener
+    // un cursor de sesión abierto durante el hash y reducir el tiempo de lock.
+    const userExists = await this.userModel
+      .findOne({ email: registerDto.email })
+      .lean()
+      .exec();
     if (userExists) {
       throw new ConflictException('El correo electrónico ya está registrado.');
     }
 
     const passwordHash = await bcrypt.hash(registerDto.password, 10);
 
-    const user = await this.userModel.create({
-      email: registerDto.email,
-      passwordHash,
-      role: 'TEACHER',
-      isActive: true,
-    });
+    // C-03: Transacción ACID — garantiza atomicidad en MongoDB Atlas (ReplicaSet activo).
+    // Si el create de Teacher falla (validación, timeout, cold start de Render),
+    // abortTransaction() revierte el User automáticamente.
+    // El bloque finally garantiza endSession() en cualquier escenario.
+    const session = await this.connection.startSession();
+    session.startTransaction();
 
-    const teacher = await this.teacherModel.create({
-      user: user._id,
-      name: registerDto.name,
-      schoolName: registerDto.schoolName,
-      schoolCycle: registerDto.schoolCycle || '2025-2026',
-      entryTime: registerDto.entryTime || '07:30',
-      shift: registerDto.shift || 'Matutino',
-    });
+    try {
+      const [user] = await this.userModel.create(
+        [{ email: registerDto.email, passwordHash, role: 'TEACHER', isActive: true }],
+        { session },
+      );
 
-    return {
-      id: user._id,
-      email: user.email,
-      role: user.role,
-      teacherId: teacher._id,
-      name: teacher.name,
-      schoolName: teacher.schoolName,
-      schoolCycle: teacher.schoolCycle,
-      entryTime: teacher.entryTime,
-      shift: teacher.shift,
-    };
+      const [teacher] = await this.teacherModel.create(
+        [{
+          user: user._id,
+          name: registerDto.name,
+          schoolName: registerDto.schoolName,
+          schoolCycle: registerDto.schoolCycle ?? '2025-2026',
+          entryTime: registerDto.entryTime ?? '07:30',
+          shift: registerDto.shift ?? 'Matutino',
+        }],
+        { session },
+      );
+
+      await session.commitTransaction();
+      this.logger.log(`Docente registrado exitosamente: ${user.email}`);
+
+      return {
+        id: user._id,
+        email: user.email,
+        role: user.role,
+        teacherId: teacher._id,
+        name: teacher.name,
+        schoolName: teacher.schoolName,
+        schoolCycle: teacher.schoolCycle,
+        entryTime: teacher.entryTime,
+        shift: teacher.shift,
+      };
+    } catch (err) {
+      // Rollback explícito: revierte el User si el Teacher falló
+      await session.abortTransaction();
+      this.logger.error(`Error en registro de docente, transacción revertida: ${(err as Error).message}`);
+      throw err;
+    } finally {
+      // Siempre liberar el cursor de sesión, incluso si el proceso muere
+      session.endSession();
+    }
   }
 
   async toggleTeacherStatus(userId: string, isActive: boolean) {
@@ -210,22 +249,8 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Usuario no encontrado');
     }
-
-    let teacherDetails = null;
-    if (user.role === 'TEACHER' || user.role === 'SUPER_ADMIN') {
-      const teacher = await this.teacherModel.findOne({ user: user._id }).lean().exec();
-      if (teacher) {
-        teacherDetails = {
-          teacherId: teacher._id.toString(),
-          name: teacher.name,
-          schoolName: teacher.schoolName,
-          schoolCycle: teacher.schoolCycle || '2025-2026',
-          entryTime: teacher.entryTime || '07:30',
-          shift: teacher.shift || 'Matutino',
-        };
-      }
-    }
-
+    // I-02: buildTeacherDetails() reemplaza el bloque duplicado de 10 líneas
+    const teacherDetails = await this.buildTeacherDetails(user._id);
     return {
       id: user._id,
       email: user.email,
@@ -241,28 +266,20 @@ export class AuthService {
       throw new UnauthorizedException('Usuario no encontrado');
     }
 
-    let teacherDetails = null;
     if (user.role === 'TEACHER' || user.role === 'SUPER_ADMIN') {
       const teacher = await this.teacherModel.findOne({ user: user._id }).exec();
       if (teacher) {
-        if (updateDto.name && updateDto.name.trim()) teacher.name = updateDto.name.trim();
-        if (updateDto.schoolName && updateDto.schoolName.trim()) teacher.schoolName = updateDto.schoolName.trim();
-        if (updateDto.schoolCycle && updateDto.schoolCycle.trim()) teacher.schoolCycle = updateDto.schoolCycle.trim();
-        if (updateDto.entryTime && updateDto.entryTime.trim()) teacher.entryTime = updateDto.entryTime.trim();
-        if (updateDto.shift && updateDto.shift.trim()) teacher.shift = updateDto.shift.trim();
+        if (updateDto.name?.trim()) teacher.name = updateDto.name.trim();
+        if (updateDto.schoolName?.trim()) teacher.schoolName = updateDto.schoolName.trim();
+        if (updateDto.schoolCycle?.trim()) teacher.schoolCycle = updateDto.schoolCycle.trim();
+        if (updateDto.entryTime?.trim()) teacher.entryTime = updateDto.entryTime.trim();
+        if (updateDto.shift?.trim()) teacher.shift = updateDto.shift.trim();
         await teacher.save();
-
-        teacherDetails = {
-          teacherId: teacher._id.toString(),
-          name: teacher.name,
-          schoolName: teacher.schoolName,
-          schoolCycle: teacher.schoolCycle,
-          entryTime: teacher.entryTime,
-          shift: teacher.shift,
-        };
       }
     }
 
+    // I-02: buildTeacherDetails() consulta el estado actualizado y construye la respuesta
+    const teacherDetails = await this.buildTeacherDetails(user._id);
     return {
       id: user._id,
       email: user.email,

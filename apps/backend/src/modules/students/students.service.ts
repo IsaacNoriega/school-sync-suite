@@ -1,6 +1,7 @@
 import { Injectable, ForbiddenException, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { randomUUID } from 'crypto';
 import { Student, StudentDocument } from '../../database/schemas/student.schema';
 import { Attendance } from '../../database/schemas/attendance.schema';
 import { Grade } from '../../database/schemas/grade.schema';
@@ -76,8 +77,11 @@ export class StudentsService {
       }
     }
 
-    const suffix = Math.random().toString(36).substring(2, 7).toUpperCase();
-    const qrCode = `STUDENT-${teacherId.substring(18, 24).toUpperCase()}-${Date.now().toString(36).toUpperCase()}-${suffix}`;
+    // M-04: Generación de QR con crypto.randomUUID() — espacio de colisión 1/2^122.
+    // Reemplaza Math.random() + Date.now() que era vulnerable a colisiones
+    // en registros concurrentes (mismo milisegundo + seed próximos).
+    // El prefijo 'STU-' es compatible con el escanner existente.
+    const qrCode = `STU-${randomUUID().replace(/-/g, '').substring(0, 20).toUpperCase()}`;
 
     const doc = await this.studentModel.create({
       teacher: teacherId,
