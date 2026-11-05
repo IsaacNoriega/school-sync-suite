@@ -29,6 +29,12 @@ export default function LoginForm() {
   const router = useRouter();
 
   useEffect(() => {
+    const savedEmail = localStorage.getItem('saved_email');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
 
@@ -50,12 +56,6 @@ export default function LoginForm() {
         }
       }
     }
-
-    const savedEmail = localStorage.getItem('saved_email');
-    if (savedEmail) {
-      setEmail(savedEmail);
-      setRememberMe(true);
-    }
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -72,9 +72,9 @@ export default function LoginForm() {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        // C-01: credentials:'include' para que el navegador acepte la cookie HttpOnly
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
 
@@ -84,7 +84,10 @@ export default function LoginForm() {
         throw new Error(data.message || 'Error al iniciar sesión');
       }
 
-      localStorage.setItem('token', data.access_token);
+      // Guardamos access_token y perfil para compatibilidad con Bearer token en todas las vistas
+      if (data.access_token) {
+        localStorage.setItem('token', data.access_token);
+      }
       localStorage.setItem('user', JSON.stringify(data.user));
 
       if (rememberMe) {

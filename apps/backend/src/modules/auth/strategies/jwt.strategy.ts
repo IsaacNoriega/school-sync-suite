@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { Request } from 'express';
 import { User } from '../../../database/schemas/user.schema';
 import { Teacher } from '../../../database/schemas/teacher.schema';
 
@@ -17,9 +18,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new Error('JWT_SECRET environment variable is required');
     }
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      // C-01: Extrae el JWT desde la cookie HttpOnly (primera prioridad).
+      // Si la cookie no existe, acepta el header Authorization: Bearer como
+      // fallback para compatibilidad con mobile/Postman durante la transición.
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        (req: Request) => req?.cookies?.access_token ?? null,
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ]),
       ignoreExpiration: false,
       secretOrKey: secret,
+      passReqToCallback: false,
     });
   }
 

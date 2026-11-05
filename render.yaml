@@ -1,4 +1,4 @@
-﻿services:
+services:
   # Backend (NestJS)
   - type: web
     name: school-sync-backend
@@ -7,14 +7,23 @@
     buildCommand: pnpm build:shared && pnpm --filter backend build
     startCommand: pnpm --filter backend start:prod
     envVars:
+      - key: NODE_ENV
+        value: production          # Habilita secure:true y sameSite:'none' en cookies
       - key: MONGO_URI
-        sync: false  # Configurar manualmente en el dashboard de Render
+        sync: false                # Configurar manualmente en el dashboard de Render
       - key: JWT_SECRET
-        generateValue: true
+        generateValue: true        # Render genera un UUID v4 seguro automáticamente
       - key: JWT_EXPIRATION
-        value: 24h
+        value: 4h                  # Alineado con maxAge de la cookie (4h)
       - key: PORT
         value: 3001
+      - key: ALLOWED_ORIGINS
+        # Reemplazar con la URL real del frontend después del primer deploy
+        value: https://school-sync-frontend.onrender.com
+      - key: ADMIN_EMAIL
+        sync: false                # Configurar manualmente en el dashboard de Render
+      - key: ADMIN_PASSWORD
+        sync: false                # Configurar manualmente en el dashboard de Render
 
   # Frontend (Next.js)
   - type: web
@@ -24,5 +33,7 @@
     buildCommand: pnpm build:shared && pnpm --filter frontend build
     startCommand: pnpm --filter frontend start
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: NEXT_PUBLIC_API_URL
         value: https://school-sync-backend.onrender.com

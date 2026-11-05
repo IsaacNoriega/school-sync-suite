@@ -16,8 +16,15 @@ import { AppController } from './app.controller';
   imports: [
     MongooseModule.forRoot(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/school-sync'),
     ThrottlerModule.forRoot([{
-      ttl: 60000, // 1 minute
-      limit: 100, // max 100 requests per minute
+      ttl: 60000,   // ventana de 1 minuto
+      limit: 100,   // 100 req/min para endpoints generales
+      // Render usa X-Forwarded-For; extraemos la IP real del cliente.
+      // Sin esto, todos los usuarios comparten el mismo bucket (IP del load balancer).
+      getTracker: (req: any) => {
+        const forwarded = req.headers['x-forwarded-for'] as string | undefined;
+        const clientIp = forwarded ? forwarded.split(',')[0].trim() : req.ip;
+        return clientIp || 'unknown';
+      },
     }]),
     AuthModule,
     SubjectsModule,

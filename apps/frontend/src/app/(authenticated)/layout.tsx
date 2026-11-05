@@ -49,7 +49,7 @@ export default function AuthenticatedLayout({
       parsedUser = JSON.parse(savedUserStr);
       setUser(parsedUser);
       setToken(savedToken);
-      
+
       // Set default active tab based on role and enforce route access
       if (parsedUser.role === 'SUPER_ADMIN') {
         setActiveTab('teachers');
@@ -129,7 +129,17 @@ export default function AuthenticatedLayout({
     }
   }, [pathname, user, router]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      // C-01: Llamar al backend para que invalide (clear) la cookie HttpOnly.
+      // Sin esto el navegador retiene la cookie hasta que expire en 4h.
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {
+      // Si el backend falla, procedemos igual — el usuario sale de la UI
+    }
     clearAuthSession();
     disconnectSocket();
     setSocket(null);
