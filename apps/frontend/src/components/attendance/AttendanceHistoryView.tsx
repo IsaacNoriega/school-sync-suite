@@ -227,13 +227,11 @@ export const AttendanceHistoryView: React.FC<HistoryViewProps> = ({
     }
   }, [selectedMonth, viewMode, isOpen, fetchMonthlyReport]);
 
-  // Actualizar mes automáticamente si el usuario navega a un día de otro mes en la vista diaria
+  // Actualizar mes automáticamente solo cuando el usuario cambia la fecha en la vista diaria
   useEffect(() => {
     const monthOfDate = selectedDate.substring(0, 7);
-    if (monthOfDate !== selectedMonth) {
-      setSelectedMonth(monthOfDate);
-    }
-  }, [selectedDate, selectedMonth]);
+    setSelectedMonth((prevMonth) => (prevMonth !== monthOfDate ? monthOfDate : prevMonth));
+  }, [selectedDate]);
 
   // Exportación a Excel de la sábana de asistencia mensual
   const handleExportMonthToExcel = async () => {
@@ -477,7 +475,6 @@ export const AttendanceHistoryView: React.FC<HistoryViewProps> = ({
           isLoading={loadingMonthly}
           onMonthChange={(newMonth) => {
             setSelectedMonth(newMonth);
-            fetchMonthlyReport(newMonth);
           }}
           onExportExcel={handleExportMonthToExcel}
           isExporting={isExportingExcel}
