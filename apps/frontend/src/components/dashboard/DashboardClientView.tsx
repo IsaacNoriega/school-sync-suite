@@ -159,7 +159,7 @@ export default function DashboardClientView() {
     try {
       const u = JSON.parse(savedUser);
       setCurrentUser(u);
-    } catch (e) {}
+    } catch (e) { }
 
     fetch(`${API_BASE_URL}/auth/profile`, {
       headers: { Authorization: `Bearer ${savedToken}` },
@@ -232,7 +232,7 @@ export default function DashboardClientView() {
 
       const avatarType = fallbacks[idx % fallbacks.length];
       const hwScore = typeof item.homeworkScore === 'number' ? Math.min(100, Math.max(0, item.homeworkScore)) : 0;
-      
+
       const [yearStr, monthStr] = (selectedDate || '').split('-');
       const calDays = yearStr && monthStr ? new Date(Number(yearStr), Number(monthStr), 0).getDate() : 30;
       const attendedDays = item.attendedDaysCount ?? 0;
@@ -380,8 +380,8 @@ export default function DashboardClientView() {
           st.status === 'PRESENT'
             ? 'Presente'
             : st.status === 'LATE'
-            ? 'Retardo'
-            : 'Ausente';
+              ? 'Retardo'
+              : 'Ausente';
 
         data.push([
           idx + 1,
@@ -518,8 +518,8 @@ export default function DashboardClientView() {
         newStatus === 'PRESENT'
           ? 'Asistencia marcada como Presente'
           : newStatus === 'LATE'
-          ? 'Asistencia marcada como Retardo'
-          : 'Asistencia marcada como Ausente'
+            ? 'Asistencia marcada como Retardo'
+            : 'Asistencia marcada como Ausente'
       );
 
       // Re-fetch para sincronizar métricas y ratios acumulados con MongoDB
@@ -834,15 +834,15 @@ export default function DashboardClientView() {
                   percent >= 90
                     ? 'bg-[#84cc16]'
                     : percent >= 80
-                    ? 'bg-[#f59e0b]'
-                    : 'bg-[#ef4444]';
+                      ? 'bg-[#f59e0b]'
+                      : 'bg-[#ef4444]';
 
                 const textColor =
                   percent >= 90
                     ? 'text-[#84cc16]'
                     : percent >= 80
-                    ? 'text-[#f59e0b]'
-                    : 'text-[#ef4444]';
+                      ? 'text-[#f59e0b]'
+                      : 'text-[#ef4444]';
 
                 return (
                   <div
